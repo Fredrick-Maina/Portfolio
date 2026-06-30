@@ -209,18 +209,15 @@ body::after {
 
 .command-list {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 120px 1fr;
     gap: 10px 30px;
     margin: 10px 0;
+    align-items: start;
 }
 
-.cmd-name {
-    color: var(--accent);
-    font-weight: 700;
-}
-
+.cmd-name,
 .cmd-desc {
-    color: var(--text-dim);
+    display: block;
 }
 
 .writeup-link {

@@ -3,21 +3,21 @@ const GITHUB_REPO = "Portfolio";
 
 const COMMANDS = {
     help: () => `
-<div class="command-list">
-    <span class="cmd-name">help</span><span class="cmd-desc">Show available commands</span>
-    <span class="cmd-name">about</span><span class="cmd-desc">Learn about my background</span>
-    <span class="cmd-name">projects</span><span class="cmd-desc">View my latest work</span>
-    <span class="cmd-name">writeups</span><span class="cmd-desc">List all available reports</span>
-    <span class="cmd-name">certs</span><span class="cmd-desc">View professional certifications</span>
-    <span class="cmd-name">cd</span><span class="cmd-desc">Change directory (e.g., cd projects)</span>
-    <span class="cmd-name">ls</span><span class="cmd-desc">List files in current directory</span>
-    <span class="cmd-name">cat</span><span class="cmd-desc">Read a file (e.g., cat ghostcat.txt)</span>
-    <span class="cmd-name">history</span><span class="cmd-desc">View command history</span>
-    <span class="cmd-name">contact</span><span class="cmd-desc">Ways to reach me</span>
-    <span class="cmd-name">whoami</span><span class="cmd-desc">Display current user info</span>
-    <span class="cmd-name">clear</span><span class="cmd-desc">Clear the terminal screen</span>
-    <span class="cmd-name">sudo</span><span class="cmd-desc">Try it and see...</span>
-</div>`,
+    <div class="command-list">
+        <div class="cmd-name">help</div><div class="cmd-desc">Show available commands</div>
+        <div class="cmd-name">about</div><div class="cmd-desc">Learn about my background</div>
+        <div class="cmd-name">projects</div><div class="cmd-desc">View my latest work</div>
+        <div class="cmd-name">writeups</div><div class="cmd-desc">List all available reports</div>
+        <div class="cmd-name">certs</div><div class="cmd-desc">View professional certifications</div>
+        <div class="cmd-name">cd</div><div class="cmd-desc">Change directory (e.g., cd projects)</div>
+        <div class="cmd-name">ls</div><div class="cmd-desc">List files in current directory</div>
+        <div class="cmd-name">cat</div><div class="cmd-desc">Read a file (e.g., cat ghostcat.txt)</div>
+        <div class="cmd-name">history</div><div class="cmd-desc">View command history</div>
+        <div class="cmd-name">contact</div><div class="cmd-desc">Ways to reach me</div>
+        <div class="cmd-name">whoami</div><div class="cmd-desc">Display current user info</div>
+        <div class="cmd-name">clear</div><div class="cmd-desc">Clear the terminal screen</div>
+        <div class="cmd-name">sudo</div><div class="cmd-desc">Try it and see...</div>
+    </div>`,
     
     about: () => `
 <div class="profile">
