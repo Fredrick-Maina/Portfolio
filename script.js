@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.finalizeBoot = (name) => {
         const userName = name || "Guest User";
         print("");
-        print(`Welcome back, <span class="accent">${escapeHtml(userName)}</span>.`);
+        print(`Welcome to my portfolio <span class="accent">${escapeHtml(userName)}</span>.`);
         print("");
         
         typeIntroLines([
