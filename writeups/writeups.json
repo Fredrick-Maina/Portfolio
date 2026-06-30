@@ -1,0 +1,44 @@
+[
+    {
+        "id": "ghostcat.txt",
+        "title": "GHOSTCAT (CVE-2020-1938)",
+        "path": "writeups/ghostcat.txt",
+        "isExternal": false
+    },
+    {
+        "id": "mrrobotctf.txt",
+        "title": "Mr. Robot CTF Walkthrough",
+        "path": "writeups/mrrobotctf.txt",
+        "isExternal": false
+    },
+    {
+        "id": "wp-writeup-1.html",
+        "title": "WordPress Writeup 1",
+        "path": "https://fredwanjohi.wordpress.com/post-1",
+        "isExternal": true
+    },
+    {
+        "id": "wp-writeup-2.html",
+        "title": "WordPress Writeup 2",
+        "path": "https://fredwanjohi.wordpress.com/post-2",
+        "isExternal": true
+    },
+    {
+        "id": "wp-writeup-3.html",
+        "title": "WordPress Writeup 3",
+        "path": "https://fredwanjohi.wordpress.com/post-3",
+        "isExternal": true
+    },
+    {
+        "id": "wp-writeup-4.html",
+        "title": "WordPress Writeup 4",
+        "path": "https://fredwanjohi.wordpress.com/post-4",
+        "isExternal": true
+    },
+    {
+        "id": "wp-writeup-5.html",
+        "title": "WordPress Writeup 5",
+        "path": "https://fredwanjohi.wordpress.com/post-5",
+        "isExternal": true
+    }
+]
