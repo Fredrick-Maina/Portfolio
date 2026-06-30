@@ -35,12 +35,12 @@ document.addEventListener("DOMContentLoaded", () => {
     window.finalizeBoot = (name) => {
         const userName = name || "Guest User";
         print("");
-        print(`Welcome to my portfolio <span class="accent">${escapeHtml(userName)}</span>.`);
+        print(`Welcome to my portfolio, <span class="accent">${escapeHtml(userName)}</span>.`);
         print("");
         
         typeIntroLines([
             "Hi, I'm Fredrick Maina.",
-            "Ethical Hacker | Cybersecurity Professional.",
+            "Ethical Hacker | Penetration Tester | Cybersecurity Professional | Backend Developer",
             "Type 'help' to begin your exploration."
         ], () => {
             createInput(); // Regular terminal mode
