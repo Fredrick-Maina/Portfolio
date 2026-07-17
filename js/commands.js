@@ -196,14 +196,33 @@ Keep exploring.`;
 let cachedRepos = null;
 let cachedDocs = null;
 
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
 async function fetchGitHubRepos() {
     if (cachedRepos) return cachedRepos;
+
+    const localCache = localStorage.getItem('github_repos');
+    if (localCache) {
+        try {
+            const { data, timestamp } = JSON.parse(localCache);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                cachedRepos = data;
+                return cachedRepos;
+            }
+        } catch (e) {}
+    }
+
     try {
-        const response = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated`);
+        const response = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated`, {
+            headers: { "Accept": "application/vnd.github.v3+json" }
+        });
         const data = await response.json();
         if (Array.isArray(data)) {
             cachedRepos = data.filter(repo => !repo.fork);
+            localStorage.setItem('github_repos', JSON.stringify({ data: cachedRepos, timestamp: Date.now() }));
             return cachedRepos;
+        } else if (data.message && data.message.includes("API rate limit")) {
+            console.error("GitHub API Rate Limit Exceeded");
         }
         return [];
     } catch (e) {
@@ -215,15 +234,28 @@ async function fetchGitHubRepos() {
 async function fetchDocs() {
     if (cachedDocs) return cachedDocs;
 
+    const localCache = localStorage.getItem('github_docs');
+    if (localCache) {
+        try {
+            const { data, timestamp } = JSON.parse(localCache);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                cachedDocs = data;
+                return cachedDocs;
+            }
+        } catch (e) {}
+    }
+
     try {
         const response = await fetch(
-            `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/Documents`
-        );
+            `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/Documents`, {
+            headers: { "Accept": "application/vnd.github.v3+json" }
+        });
         const data = await response.json();
         if (Array.isArray(data)) {
             cachedDocs = data
                 .filter(file => file.type === "file")
                 .map(file => ({ name: file.name, url: file.download_url }));
+            localStorage.setItem('github_docs', JSON.stringify({ data: cachedDocs, timestamp: Date.now() }));
             return cachedDocs;
         }
     } catch (e) {
