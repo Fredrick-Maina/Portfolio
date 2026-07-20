@@ -9,6 +9,7 @@ const COMMANDS = {
         <div class="cmd-name">projects</div><div class="cmd-desc">View my latest work</div>
         <div class="cmd-name">writeups</div><div class="cmd-desc">List all available reports</div>
         <div class="cmd-name">certs</div><div class="cmd-desc">View professional certifications</div>
+        <div class="cmd-name">resume</div><div class="cmd-desc">View or download my resume</div>
         <div class="cmd-name">cd</div><div class="cmd-desc">Change directory (e.g., cd projects)</div>
         <div class="cmd-name">ls</div><div class="cmd-desc">List files in current directory</div>
         <div class="cmd-name">cat</div><div class="cmd-desc">Read a file (e.g., cat ghostcat.txt)</div>
@@ -30,6 +31,16 @@ const COMMANDS = {
 Certified cybersecurity professional specialized in vulnerability assessment and offensive security.
 Holding certifications from Cisco and ICT Authority Kenya. 
 Focused on Web Security, Ethical Hacking, and Automation.`,
+
+    resume: () => `
+<div class="stack">
+    <div><strong>Fredrick Maina - Resume</strong></div>
+    <br>
+    <div>
+        <a href="Documents/resume.pdf" target="_blank" class="writeup-link">[View Resume]</a> 
+        <a href="Documents/resume.pdf" download class="writeup-link">[Download]</a>
+    </div>
+</div>`,
 
     certs: async () => {
         const docs = await fetchDocs();
