@@ -38,7 +38,7 @@ Focused on Web Security, Ethical Hacking, and Automation.`,
         let list = '<div class="stack">';
         docs.forEach((doc, i) => {
             const displayName = doc.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-            list += `<div><strong>${i + 1}. ${escapeHtml(displayName)}</strong> <a href="${escapeHtml(doc.url)}" target="_blank" class="writeup-link">[View Cert]</a></div>`;
+            list += `<div><strong>${i + 1}. ${escapeHtml(displayName)}</strong> <a href="${escapeHtml(doc.view_url)}" target="_blank" class="writeup-link">[View Cert]</a> <a href="${escapeHtml(doc.download_url)}" download class="writeup-link">[Download]</a></div>`;
         });
         list += '</div><br>Use "cd documents" to view files in the terminal.';
         return list;
@@ -57,13 +57,18 @@ Focused on Web Security, Ethical Hacking, and Automation.`,
     },
 
     writeups: async () => {
-        const files = await getFilesForDir("/writeups/");
-        let list = '<div class="stack">';
-        files.forEach(f => {
-            list += `<div>- ${f}</div>`;
-        });
-        list += '</div><br>Use "cat &lt;filename&gt;" to read.';
-        return list;
+        try {
+            const response = await fetch('writeups/writeups.json');
+            const data = await response.json();
+            let list = '<div class="stack">';
+            data.forEach((w, i) => {
+                list += `<div><strong>${i + 1}. ${escapeHtml(w.id)}</strong> - ${escapeHtml(w.title)} <a href="${escapeHtml(w.path)}" target="_blank" class="writeup-link">[View Writeup]</a></div>`;
+            });
+            list += '</div><br>Use "cd writeups" and "cat &lt;filename&gt;" to read.';
+            return list;
+        } catch (e) {
+            return '<span class="error">Failed to load writeups.</span>';
+        }
     },
 
     contact: () => `
@@ -141,7 +146,7 @@ Focused on Web Security, Ethical Hacking, and Automation.`,
                 return name === file || name === file + ".pdf" || name === file + ".png";
             });
             if (doc) {
-                window.open(doc.url, '_blank');
+                window.open(doc.view_url, '_blank');
                 return `<span class="accent">[ OPENING DOCUMENT ]</span> Opening ${escapeHtml(doc.name)} in a new tab...`;
             }
         }
@@ -150,7 +155,10 @@ Focused on Web Security, Ethical Hacking, and Automation.`,
         try {
             const response = await fetch('writeups/writeups.json');
             const data = await response.json();
-            const found = data.find(w => w.id === file || w.id === file + ".txt" || w.id === file + ".html");
+            const found = data.find(w => {
+                const wId = w.id.toLowerCase();
+                return wId === file || wId === file + ".txt" || wId === file + ".html";
+            });
             
             if (found) {
                 if (found.isExternal) {
@@ -239,7 +247,11 @@ async function fetchDocs() {
         try {
             const { data, timestamp } = JSON.parse(localCache);
             if (Date.now() - timestamp < CACHE_DURATION) {
-                cachedDocs = data;
+                cachedDocs = data.map(d => ({
+                    name: d.name,
+                    download_url: d.download_url || d.url,
+                    view_url: d.view_url || `Documents/${d.name}`
+                }));
                 return cachedDocs;
             }
         } catch (e) {}
@@ -254,7 +266,11 @@ async function fetchDocs() {
         if (Array.isArray(data)) {
             cachedDocs = data
                 .filter(file => file.type === "file")
-                .map(file => ({ name: file.name, url: file.download_url }));
+                .map(file => ({ 
+                    name: file.name, 
+                    download_url: file.download_url,
+                    view_url: `Documents/${file.name}` 
+                }));
             localStorage.setItem('github_docs', JSON.stringify({ data: cachedDocs, timestamp: Date.now() }));
             return cachedDocs;
         }
