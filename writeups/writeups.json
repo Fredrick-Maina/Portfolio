@@ -1,44 +1,25 @@
 [
     {
-        "id": "ghostcat.txt",
-        "title": "GHOSTCAT (CVE-2020-1938)",
-        "path": "writeups/ghostcat.txt",
-        "isExternal": false
-    },
-    {
-        "id": "mrrobotctf.txt",
-        "title": "Mr. Robot CTF Walkthrough",
-        "path": "writeups/mrrobotctf.txt",
-        "isExternal": false
-    },
-    {
-        "id": "wp-writeup-1.html",
-        "title": "WordPress Writeup 1",
-        "path": "https://fredwanjohi.wordpress.com/post-1",
+        "id": "LUNIZZ CTF WriteUp",
+        "title": "LUNIZZ CTF",
+        "path": "https://fredrickmaina6.wordpress.com/%f0%9f%a7%a0-lunizz-ctf-writeup/",
         "isExternal": true
     },
     {
-        "id": "wp-writeup-2.html",
-        "title": "WordPress Writeup 2",
-        "path": "https://fredwanjohi.wordpress.com/post-2",
+        "id": "ContAInment on THM",
+        "title": "ContAInment CTF Walkthrough",
+        "path": "https://fredrickmaina6.wordpress.com/containment-on-tryhackme/",
         "isExternal": true
     },
     {
-        "id": "wp-writeup-3.html",
-        "title": "WordPress Writeup 3",
-        "path": "https://fredwanjohi.wordpress.com/post-3",
+        "id": "LO-FI on TryHackMe",
+        "title": "LO-FI Walkthrough",
+        "path": "https://fredrickmaina6.wordpress.com/lo-fi-tryhackme/",
         "isExternal": true
     },
     {
-        "id": "wp-writeup-4.html",
-        "title": "WordPress Writeup 4",
-        "path": "https://fredwanjohi.wordpress.com/post-4",
-        "isExternal": true
-    },
-    {
-        "id": "wp-writeup-5.html",
-        "title": "WordPress Writeup 5",
-        "path": "https://fredwanjohi.wordpress.com/post-5",
-        "isExternal": true
+	"id": "SPOOKIFIER HTB",
+	"title": "Spookifier Room on Hack The Box Walkthrough",
+	"path": "https://fredrickmaina6.wordpress.com/spookifier-on-hack-the-box/"
     }
 ]
