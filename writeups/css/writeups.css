@@ -1,0 +1,55 @@
+body {
+
+    background:
+    #050505;
+
+    color:
+    #00ff88;
+
+    font-family:
+    "Courier New",
+    monospace;
+
+}
+
+
+.terminal {
+
+    width:
+    85%;
+
+    margin:
+    50px auto;
+
+    padding:
+    30px;
+
+    border:
+    1px solid #00ff88;
+
+    box-shadow:
+    0 0 20px #00ff88;
+
+}
+
+
+.writeup-card {
+
+    border-left:
+    3px solid #00ff88;
+
+    padding:
+    20px;
+
+    margin:
+    20px 0;
+
+}
+
+
+a {
+
+    color:
+    #ffcc00;
+
+}

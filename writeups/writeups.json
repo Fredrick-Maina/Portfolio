@@ -32,7 +32,10 @@
 {
 "id": "day3_hacker_holidays_2026",
 "title": "Hacker Holidays Day 3",
-"path": "writeups/day3_Hacker_Holidays_2026.txt",
+"platform": "TryHackMe",
+"category": "AWS / Cloud Security",
+"path": "writeups/day3_Hacker_Holidays_2026.html",
+"date": "30-07-2026",
 "isExternal": false
 }
 
