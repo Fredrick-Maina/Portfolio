@@ -4,10 +4,13 @@ body {
     #050505;
 
     color:
-    #00ff88;
+    #d6deeb;
 
     font-family:
-    "Courier New",
+    "JetBrains Mono",
+    "Fira Code",
+    "Cascadia Code",
+    Consolas,
     monospace;
 
 }
@@ -25,10 +28,10 @@ body {
     30px;
 
     border:
-    1px solid #00ff88;
+    1px solid #38bdf8;
 
     box-shadow:
-    0 0 20px #00ff88;
+    0 0 20px #38bdf8;
 
 }
 
@@ -36,7 +39,7 @@ body {
 .writeup-card {
 
     border-left:
-    3px solid #00ff88;
+    3px solid #38bdf8;
 
     padding:
     20px;
@@ -50,6 +53,6 @@ body {
 a {
 
     color:
-    #ffcc00;
+    #facc15;
 
 }
