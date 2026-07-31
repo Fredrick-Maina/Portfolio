@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 4: Hacker Holidays - Challenge Writeup</title>
+    <meta name="description" content="A comprehensive guide on how to solve the Day 4 Hacker Holidays network traffic analysis challenge involving HTTP cookie exfiltration and XOR decryption.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 90%;
+            margin: 40px auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        h1 {
+            font-weight: 800;
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            background: -webkit-linear-gradient(45deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            font-weight: 300;
+        }
+
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .step-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInUp 0.8s ease-out forwards;
+            opacity: 0;
+        }
+
+        .step-card:nth-child(1) { animation-delay: 0.1s; }
+        .step-card:nth-child(2) { animation-delay: 0.2s; }
+        .step-card:nth-child(3) { animation-delay: 0.3s; }
+        .step-card:nth-child(4) { animation-delay: 0.4s; }
+        .step-card:nth-child(5) { animation-delay: 0.5s; }
+
+        .step-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .step-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .step-number {
+            background: linear-gradient(45deg, #38bdf8, #2563eb);
+            color: white;
+            font-weight: 800;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        p {
+            line-height: 1.7;
+            color: #cbd5e1;
+            margin-bottom: 10px;
+        }
+
+        code {
+            background: #1e293b;
+            color: #38bdf8;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            border: 1px solid #334155;
+        }
+
+        .code-block {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            color: #a7f3d0;
+            font-family: monospace;
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .flag-box {
+            text-align: center;
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+            border: 2px dashed #38bdf8;
+            border-radius: 16px;
+            animation: pulse 2s infinite alternate;
+        }
+
+        .flag-box h3 {
+            color: #38bdf8;
+            margin: 0 0 10px 0;
+            font-size: 1.5rem;
+        }
+
+        .flag-text {
+            font-family: monospace;
+            font-size: 1.8rem;
+            color: #f8fafc;
+            letter-spacing: 2px;
+            font-weight: 800;
+        }
+
+        @keyframes pulse {
+            from { box-shadow: 0 0 10px rgba(56, 189, 248, 0.1); }
+            to { box-shadow: 0 0 25px rgba(56, 189, 248, 0.3); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Day 4: Hacker Holidays</h1>
+            <p class="subtitle">Network Traffic Analysis & Cryptography Writeup</p>
+        </header>
+
+        <div class="timeline">
+            <!-- Step 1 -->
+            <div class="step-card" id="step-1">
+                <div class="step-title">
+                    <div class="step-number">1</div>
+                    <h2>Analyze the Network Traffic</h2>
+                </div>
+                <p>We start by examining the provided <code>traffic.pcapng</code> file. The brief mentions tiny packets, suspicious regularity, and data hidden in ordinary-looking traffic.</p>
+                <p>By filtering the traffic using tools like Wireshark or Tshark, we noticed 30 highly regular HTTP <code>GET</code> requests to the root path <code>/</code> of <code>byte-lotus-hotel.thm:8080</code>.</p>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step-card" id="step-2">
+                <div class="step-title">
+                    <div class="step-number">2</div>
+                    <h2>Inspect the HTTP Headers</h2>
+                </div>
+                <p>Diving deeper into these HTTP requests, we found a suspicious cookie named <code>hotel_sess_state</code>. Instead of a normal session ID, these cookies contained very short Base64 strings (like <code>HA==</code>, <code>AA==</code>, <code>BQ==</code>).</p>
+                <p>This indicated data was being exfiltrated byte-by-byte inside the HTTP Cookie header.</p>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step-card" id="step-3">
+                <div class="step-title">
+                    <div class="step-number">3</div>
+                    <h2>Extract and Decode Base64</h2>
+                </div>
+                <p>Using Tshark, we extracted all values of the <code>hotel_sess_state</code> cookie sequentially and decoded the Base64 to reveal a stream of raw hexadecimal bytes.</p>
+                <div class="code-block">
+                    Extracted Bytes: 1c 00 05 33 1e 7b 3a 7c 17 ...
+                </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="step-card" id="step-4">
+                <div class="step-title">
+                    <div class="step-number">4</div>
+                    <h2>Perform a Known-Plaintext Attack (KPA)</h2>
+                </div>
+                <p>The extracted bytes didn't immediately form readable ASCII. Knowing this is a CTF challenge, the flag likely starts with <code>THM{</code>. We can use this to reverse-engineer an XOR cipher.</p>
+                <p>By XORing the first four extracted bytes against the known plaintext <code>THM{</code>, we get a repeating pattern:</p>
+                <div class="code-block">
+                    0x1c ⊕ 0x54 ('T') = 0x48 ('H')<br>
+                    0x00 ⊕ 0x48 ('H') = 0x48 ('H')<br>
+                    0x05 ⊕ 0x4d ('M') = 0x48 ('H')<br>
+                    0x33 ⊕ 0x7b ('{') = 0x48 ('H')
+                </div>
+                <p>This confirms a single-byte XOR cipher was used with the key <code>0x48</code>.</p>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="step-card" id="step-5">
+                <div class="step-title">
+                    <div class="step-number">5</div>
+                    <h2>Decrypt the Payload</h2>
+                </div>
+                <p>Finally, we apply the XOR key <code>0x48</code> to the entire sequence of extracted bytes. A simple Python script gets the job done and reveals the hidden data.</p>
+                
+                <div class="flag-box">
+                    <h3>Challenge Solved</h3>
+                    <div class="flag-text">THM{V3r4_1s_w4tch1ng_0veR_y0u}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

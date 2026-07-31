@@ -1,12 +1,12 @@
 [
     {
-        "id": "LUNIZZ CTF WriteUp",
+        "id": "LUNIZZ CTF WriteUp on TryHackMe",
         "title": "LUNIZZ CTF",
         "path": "https://fredrickmaina6.wordpress.com/%f0%9f%a7%a0-lunizz-ctf-writeup/",
         "isExternal": true
     },
     {
-        "id": "ContAInment on THM",
+        "id": "ContAInment on TryHackMe",
         "title": "ContAInment CTF Walkthrough",
         "path": "https://fredrickmaina6.wordpress.com/containment-on-tryhackme/",
         "isExternal": true
@@ -18,24 +18,33 @@
         "isExternal": true
     },
     {
-	"id": "SPOOKIFIER HTB",
+	"id": "SPOOKIFIER HackTheBox",
 	"title": "Spookifier Room on Hack The Box Walkthrough",
 	"path": "https://fredrickmaina6.wordpress.com/spookifier-on-hack-the-box/",
 	"isExternal": true
     },
 {
 "id": "Agent T",
-"title": "Try Hack Me Agent T walkthrough",
+"title": "TryHackMe Agent T walkthrough",
 "path": "https://fredrickmaina6.wordpress.com/try-hack-me-agent-t-walkthrough/",
 "isExternal": true
 },
+
 {
-"id": "day3_hacker_holidays_2026",
+"id": "day3_hacker_holidays_2026 on TryHackMe",
 "title": "Hacker Holidays Day 3",
 "platform": "TryHackMe",
 "category": "AWS / Cloud Security",
 "path": "writeups/day3_Hacker_Holidays_2026.html",
 "date": "30-07-2026",
+"isExternal": false
+},
+
+{
+"id": "day4_hacker_holidays_2026 on TryHackMe",
+"title": "Hacker Holidays Day 4",
+"path": "writeups/day4_Hacker_Holidays_2026.html",
+"date": "31-07-2026",
 "isExternal": false
 }
 
