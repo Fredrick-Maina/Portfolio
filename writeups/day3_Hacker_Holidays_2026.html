@@ -9,7 +9,170 @@
         Hacker Holidays Day 3 | Byte Lotus Wellness
     </title>
 
-    <link rel="stylesheet" href="css/writeups.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .terminal {
+            max-width: 900px;
+            width: 90%;
+            margin: 40px auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        h1 {
+            font-weight: 800;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: -webkit-linear-gradient(45deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            font-weight: 300;
+        }
+
+        section {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+
+        section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            border-bottom: 2px solid rgba(56, 189, 248, 0.3);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            color: #a5b4fc;
+            margin-top: 25px;
+        }
+
+        p, ul, ol, li {
+            line-height: 1.7;
+            color: #cbd5e1;
+        }
+
+        pre {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            color: #a7f3d0;
+            font-family: monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        code {
+            font-family: monospace;
+            color: #38bdf8;
+            font-size: 0.95em;
+        }
+        
+        pre code {
+            color: inherit;
+        }
+
+        hr {
+            display: none; /* Hide old separators since we use cards now */
+        }
+
+        .alert, .success, .flag {
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            backdrop-filter: blur(5px);
+        }
+
+        .alert {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            color: #fca5a5;
+        }
+
+        .success {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid #10b981;
+            color: #6ee7b7;
+        }
+
+        .flag {
+            text-align: center;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+            border: 2px dashed #38bdf8;
+            font-family: monospace;
+            font-size: 1.5rem;
+            color: #f8fafc;
+            letter-spacing: 2px;
+            font-weight: 800;
+            animation: pulse 2s infinite alternate;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #64748b;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            from { box-shadow: 0 0 10px rgba(56, 189, 248, 0.1); }
+            to { box-shadow: 0 0 25px rgba(56, 189, 248, 0.3); }
+        }
+    </style>
 </head>
 
 
