@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hacker Holidays - The Byte Lotus Hotel - Overheard at Breakfast</title>
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+
+<body>
+
+<div class="terminal">
+
+    <h1>Hacker Holidays · The Byte Lotus Hotel</h1>
+    <h2>Overheard at Breakfast</h2>
+
+    <section class="writeup-card">
+
+        <h2>Room Information</h2>
+
+        <p>
+            <b>Category:</b> OSINT<br>
+            <b>Difficulty:</b> Easy<br>
+            <b>Points:</b> 60
+        </p>
+
+        <p>
+            The challenge involved investigating a leaked conversation screenshot
+            and using the available clues to locate a hidden account.
+        </p>
+
+        <p>
+            The objectives were:
+        </p>
+
+        <ul>
+            <li>Analyze the provided conversation for identifying details</li>
+            <li>Extract useful OSINT clues</li>
+            <li>Locate the hidden account</li>
+            <li>Retrieve the flag</li>
+        </ul>
+
+    </section>
+
+
+    <section class="writeup-card">
+
+        <h2>Initial Evidence - Conversation Screenshot</h2>
+
+        <p>
+            The investigation started with the provided screenshot from the task files.
+            The screenshot contained a conversation where Lambo revealed useful
+            information about his previous online presence.
+        </p>
+
+        <img src="images/conversation.png"
+             alt="Breakfast conversation screenshot"
+             style="max-width:100%; border:1px solid #38bdf8; box-shadow:0 0 15px #38bdf8;">
+
+        <p>
+            While reading through the conversation carefully, I noticed Lambo said
+            that he had wiped his media accounts.
+        </p>
+
+        <p>
+            However, he mentioned that he previously used a service where he could
+            neatly link all his accounts together. He could not remember the name,
+            but remembered that it started with the letter <b>G</b>.
+        </p>
+
+        <p>
+            This was the first major clue and pointed towards an identity service
+            rather than a traditional social media platform.
+        </p>
+
+    </section>
+
+
+    <section class="writeup-card">
+
+        <h2>Email OSINT Enumeration</h2>
+
+        <p>
+            The conversation provided an email address which became the main OSINT
+            pivot:
+        </p>
+
+        <pre>
+lambobytelotushotel@gmail.com
+        </pre>
+
+        <p>
+            I used <b>Epieos</b> to investigate the email address and discover
+            associated online services.
+        </p>
+
+        <p>
+            The lookup revealed that the email address was connected to a
+            <b>Gravatar</b> account.
+        </p>
+
+        <p>
+            This matched the screenshot clue about a service beginning with the
+            letter <b>G</b>.
+        </p>
+
+    </section>
+
+
+    <section class="writeup-card">
+
+        <h2>Hash Investigation</h2>
+
+        <p>
+            Epieos provided information related to the Gravatar account, but the
+            hash returned by Epieos did not directly work for accessing the profile.
+        </p>
+
+        <p>
+            Since Gravatar relies on email hashes, I generated the hash manually
+            from the email address.
+        </p>
+
+        <pre>
+echo -n "lambobytelotushotel@gmail.com" | sha256sum
+        </pre>
+
+        <p>
+            The generated SHA-256 hash was the correct identifier needed to locate
+            the Gravatar profile.
+        </p>
+
+    </section>
+
+
+    <section class="writeup-card">
+
+        <h2>Gravatar Discovery</h2>
+
+        <p>
+            Using the calculated hash, the hidden profile was found.
+        </p>
+
+        <pre>
+Lambo
+Lam-boh · Byte Lotus Hotel
+        </pre>
+
+        <p>
+            The profile contained the hidden prize:
+        </p>
+
+        <pre>
+VEhNe1MzY3JlVF9QcjBmaWwzX0g0c19iMzNuX0lkZW50MWZpM2R9
+        </pre>
+
+    </section>
+
+
+    <section class="writeup-card">
+
+        <h2>Flag Extraction</h2>
+
+        <p>
+            The value was Base64 encoded, so it was decoded:
+        </p>
+
+        <pre>
+echo "VEhNe1MzY3JlVF9QcjBmaWwzX0g0c19iMzNuX0lkZW50MWZpM2R9" | base64 -d
+        </pre>
+
+        <p>
+            The decoded result was:
+        </p>
+
+        <pre>
+THM{S3creT_Pr0fil3_H4s_b33n_Ident1fi3d}
+        </pre>
+
+    </section>
+
+
+    <section class="writeup-card">
+
+        <h2>Conclusion</h2>
+
+        <p>
+            The challenge demonstrated how small pieces of information can be
+            combined during an OSINT investigation.
+        </p>
+
+        <p>
+            The final chain was:
+        </p>
+
+        <pre>
+Conversation Screenshot
+        ↓
+Email Address
+        ↓
+Epieos Email Enumeration
+        ↓
+Gravatar Discovery
+        ↓
+SHA-256 Email Hash Verification
+        ↓
+Hidden Profile
+        ↓
+Base64 Decoding
+        ↓
+Flag
+        </pre>
+
+        <p>
+            <b>Flag:</b>
+        </p>
+
+        <pre>
+THM{S3creT_Pr0fil3_H4s_b33n_Ident1fi3d}
+        </pre>
+
+    </section>
+
+
+</div>
+
+</body>
+</html>
