@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hacker Holidays - Byte Lotus Hotel Day 0 Writeup</title>
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+
+<body>
+
+<div class="terminal">
+
+    <h1>🏝️ Hacker Holidays · The Byte Lotus Hotel</h1>
+    <h2>Day 0 — OSINT</h2>
+
+    <div class="writeup-card">
+
+        <h2>🛎️ Room Information</h2>
+
+        <p>
+            <strong>Category:</strong> OSINT<br>
+            <strong>Difficulty:</strong> Easy<br>
+            <strong>Points:</strong> 30
+        </p>
+
+        <p>
+            Before arriving at the Byte Lotus Hotel, the task was to investigate
+            a suspicious brochure image. The briefing hinted that the hero image
+            contained an AI fingerprint and that something hidden inside would
+            lead to a social media account the hotel did not intend to expose.
+        </p>
+
+    </div>
+
+
+    <div class="writeup-card">
+
+        <h2>📸 Initial Clue — Brochure Analysis</h2>
+
+        <p>
+            The provided task file was:
+        </p>
+
+        <pre>
+brochure.png
+        </pre>
+
+        <img src="images/thebrochure.png" 
+             alt="Byte Lotus Hotel brochure image"
+             style="max-width:80%; border:1px solid #38bdf8;">
+
+        <p>
+            The image was inspected for hidden information and suspicious
+            indicators. The AI-generated appearance of the brochure image
+            suggested that it contained an intentional OSINT breadcrumb.
+        </p>
+
+        <p>
+            Further analysis revealed a clue pointing towards the hotel's
+            social media presence.
+        </p>
+
+    </div>
+
+
+    <div class="writeup-card">
+
+        <h2>📱 Finding the Hotel Account</h2>
+
+        <p>
+            Following the clue from the brochure led to the Instagram account:
+        </p>
+
+        <pre>
+@thebytelotusresort
+        </pre>
+
+        <p>
+            The account itself contained an important observation:
+            it followed only one account.
+        </p>
+
+        <p>
+            The only followed account was:
+        </p>
+
+        <pre>
+@veratheconcierge
+        </pre>
+
+        <p>
+            This matched the theme from the room briefing and suggested that
+            Vera the Concierge was part of the hidden trail.
+        </p>
+
+    </div>
+
+
+    <div class="writeup-card">
+
+        <h2>🔎 Extracting the Hidden Message</h2>
+
+        <p>
+            The concierge account contained three posts with images that
+            included encoded fragments. The same fragments were also present
+            in the comments, confirming they were intentional clues.
+        </p>
+
+
+        <pre>
+VEhNe1YzckBzX2FD
+
+QzB1bnRfaDRzX2Iz
+
+M25fZjB1bmQhfQ==
+        </pre>
+
+
+        <p>
+            The fragments were combined into a single Base64 string:
+        </p>
+
+
+        <pre>
+VEhNe1YzckBzX2FDQzB1bnRfaDRzX2IzM25fZjB1bmQhfQ==
+        </pre>
+
+
+        <p>
+            Decoding the Base64 value revealed the hidden flag.
+        </p>
+
+    </div>
+
+
+    <div class="writeup-card">
+
+        <h2>🚩 Flag</h2>
+
+        <pre>
+THM{PLACEHOLDER}
+        </pre>
+
+    </div>
+
+
+    <div class="writeup-card">
+
+        <h2>🧠 Lessons Learned</h2>
+
+        <ul>
+            <li>AI-generated images can contain useful OSINT clues.</li>
+            <li>Social media relationship analysis can reveal hidden accounts.</li>
+            <li>Small details such as a single follow can be a major lead.</li>
+            <li>Encoded fragments found across multiple posts often need to be combined before decoding.</li>
+        </ul>
+
+    </div>
+
+
+</div>
+
+</body>
+</html>
