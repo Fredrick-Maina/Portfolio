@@ -46,9 +46,15 @@
 "path": "writeups/day4_Hacker_Holidays_2026.html",
 "date": "31-07-2026",
 "isExternal": false
+},
+
+{
+"id": "day5_hacker_holidays_2026 on TryHackMe",
+"title": "Hacker Holidays Day 5",
+"path": "writeups/day5_Hacker_Holidays_2026.html",
+"date": "01-08-2026",
+"isExternal": false
 }
-
-
 
 
 ]
