@@ -689,15 +689,204 @@ nvme0n1     259:1    0    20G  0 disk
 
             <p>The root filesystem lives on <code>/dev/nvme0n1p1</code> (partition 1 of the NVMe drive). The raw disk is <code>/dev/nvme0n1</code>.</p>
 
-            <h3>5.3 Attempting to Read the Root Flag — Three Approaches</h3>
-            <p>The root flag is in <code>/root/root.txt</code>. We try three different methods:</p>
+              <h3>5.3 Attempting to Read the Root Flag — Three Approaches</h3>
+    <p>The root flag is located at <code>/root/root.txt</code>. We try three different methods to access it:</p>
 
-            <p><strong>Approach 1 — Direct <code>cat</code> (Fails):</strong></p>
-            <div class="code-block">
-                <div class="label">Attempt 1: Direct File Read</div>
-                <pre>process.mainModule.require('child_process').execSync('cat /root/root.txt 2>/dev/null || echo "direct read failed"').toString()</pre>
-                <div class="output">direct read failed</div>
-            </div>
-            <p><strong>Why it fails:</strong> Although we're in the <code>disk</code> group, the <em>mounted</em> filesystem still enforces standard Unix permissions. The <code>/root</code> directory has permissions <code>drwx------</code> (700), meaning only root can traverse it. The kernel's VFS (Virtual File System) layer checks these permissions on every <code>cat</code> call.</p>
+    <p><strong>Approach 1 — Direct <code>cat</code> (Fails):</strong></p>
+    <div class="code-block">
+        <div class="label">Attempt 1: Direct File Read</div>
+        <pre>process.mainModule.require('child_process').execSync('cat /root/root.txt 2>/dev/null || echo "direct read failed"').toString()</pre>
+        <div class="output">direct read failed</div>
+    </div>
+    <p><strong>Why it fails:</strong> Although we're in the <code>disk</code> group, the <em>mounted</em> filesystem still enforces standard Unix permissions. The <code>/root</code> directory has permissions <code>drwx------</code> (700), meaning only root can traverse it. The kernel's VFS (Virtual File System) layer checks these permissions on every file access through normal system calls — <code>disk</code> group membership doesn't bypass this layer.</p>
 
-            <p><strong>Approach
+    <p><strong>Approach 2 — <code>strings</code> on Raw Disk (Fails):</strong></p>
+    <div class="code-block">
+        <div class="label">Attempt 2: Grepping Raw Disk with strings</div>
+        <pre>process.mainModule.require('child_process').execSync('bash -c "strings /dev/nvme0n1 2>/dev/null | grep -i \'THM{\' | head -5"').toString()</pre>
+        <div class="output">(empty — no output)</div>
+    </div>
+    <p><strong>Why it fails:</strong> <code>strings</code> scans the raw 20GB disk looking for sequences of printable characters. The flag file is a tiny text file stored inside the ext4 filesystem on the partition. On disk, files are split across blocks scattered throughout the drive. The flag text may be fragmented, never appearing as a contiguous printable sequence that <code>strings</code> can capture. Additionally, searching 20GB of raw data — including binaries, libraries, logs, and filesystem metadata — generates enormous noise. The flag simply gets lost in it all.</p>
+
+    <p><strong>Approach 3 — <code>debugfs</code> Raw Filesystem Read (Success):</strong></p>
+    <div class="code-block">
+        <div class="label">Attempt 3: debugfs Bypassing Filesystem Permissions</div>
+        <pre>process.mainModule.require('child_process').execSync('bash -c "debugfs /dev/nvme0n1p1 -R \'cat /root/root.txt\' 2>/dev/null"').toString()</pre>
+        <div class="output">THM{r4w_d1sk_4cc3ss_w4s_t00_much}</div>
+    </div>
+
+    <div class="flag-box">
+        <div class="flag-label">🏁 Root Flag</div>
+        <div class="flag-value">THM{r4w_d1sk_4cc3ss_w4s_t00_much}</div>
+    </div>
+    <p><em>(Actual flag redacted — complete the room yourself to earn it!)</em></p>
+
+    <h3>5.4 Why <code>debugfs</code> Works When Everything Else Fails</h3>
+    <p>This is the educational heart of the room. Let's break down exactly what's happening under the hood.</p>
+
+    <p><strong>What is <code>debugfs</code>?</strong><br>
+    <code>debugfs</code> is an ext2/ext3/ext4 filesystem debugger. It's designed for low-level filesystem inspection and repair. Unlike <code>cat</code>, <code>ls</code>, or any normal file operation, <code>debugfs</code> does <strong>not</strong> go through the kernel's VFS (Virtual File System) layer. Instead, it reads the raw block device directly — interpreting inodes, directory entries, and data blocks from the raw bytes on disk.</p>
+
+    <p><strong>Why does the <code>disk</code> group matter?</strong><br>
+    Let's check the permissions on the block device:</p>
+
+    <div class="code-block">
+        <div class="label">Block Device Permissions</div>
+        <pre>ls -la /dev/nvme0n1p1
+brw-rw---- 1 root disk 259, 2 Aug  4 21:03 /dev/nvme0n1p1</pre>
+    </div>
+
+    <p>The device file has group ownership <code>disk</code> with read/write permissions for the group (<code>rw-</code>). Since <code>pipelinesvc</code> is a member of the <code>disk</code> group, it has <strong>raw read access to the entire partition</strong> — every block, every inode, every byte. The kernel allows the <code>open()</code> system call on the device file because the group permission check passes.</p>
+
+    <p><strong>The bypass explained, step by step:</strong><br>
+    When <code>debugfs</code> opens <code>/dev/nvme0n1p1</code>, it reads the filesystem purely as a <strong>data structure</strong>:</p>
+
+    <ol style="color: var(--text-secondary); padding-left: 1.5rem; margin-bottom: 1rem;">
+        <li>It reads the <strong>superblock</strong> to understand the filesystem layout — block size, inode count, journal location, etc.</li>
+        <li>It locates the <strong>root inode</strong> (always inode 2 on ext4) to find the root directory's data blocks</li>
+        <li>It traverses <strong>directory entries</strong> to find <code>root.txt</code>'s inode number — directory entries are just lists of (name, inode) pairs</li>
+        <li>It reads the <strong>inode</strong> for <code>root.txt</code> to get the list of data blocks that hold the file's contents</li>
+        <li>It reads those <strong>data blocks</strong> directly and outputs the contents</li>
+    </ol>
+
+    <p>At <strong>no point</strong> in this process does <code>debugfs</code> check:</p>
+    <ul style="color: var(--text-secondary); padding-left: 1.5rem; margin-bottom: 1rem;">
+        <li>File ownership (<code>chown</code>)</li>
+        <li>File permissions (<code>chmod rwx------</code>)</li>
+        <li>Directory permissions on <code>/root</code></li>
+        <li>Access Control Lists (ACLs)</li>
+        <li>Any extended attributes or SELinux contexts</li>
+    </ul>
+
+    <p>The filesystem's permission model is a <strong>kernel-enforced</strong> construct that lives in the VFS layer. By bypassing the kernel entirely and reading the disk directly, <code>debugfs</code> sidesteps the entire security model. This is why <code>disk</code> group membership is effectively root-equivalent — it grants unfiltered, raw access to every file on the system regardless of ownership or permissions.</p>
+
+    <p><strong>Why the <code>strings</code> approach failed — the deeper explanation:</strong><br>
+    When a file is stored on an ext4 filesystem, its data is split into <strong>blocks</strong> (typically 4KB each). These blocks are <strong>not guaranteed to be contiguous</strong> on disk. A 100-byte text file like <code>root.txt</code> fits in a single block, but that block could be located anywhere within the 20GB partition — next to a kernel binary, between log file fragments, or in the middle of a deleted JPEG. <code>strings</code> scans sequentially through the entire disk extracting runs of printable characters. It has <strong>no concept of filesystem structure</strong> — it doesn't know which blocks belong to which files, nor does it understand inodes or directory hierarchies. Even if the flag bytes exist on disk, <code>strings</code> would see them as just another random string among millions, indistinguishable from all the other text fragments extracted from binaries, configuration files, and system logs scattered across 20GB of raw storage.</p>
+
+    <p><code>debugfs</code>, by contrast, understands the ext4 data structures intimately. It reads the inode table, finds the exact block numbers allocated to <code>root.txt</code>, and assembles them in the correct order — guaranteeing the file contents are reconstructed perfectly, every time.</p>
+
+</section>
+
+<!-- ========== LESSONS LEARNED ========== -->
+<section>
+    <h2>📚 Lessons Learned</h2>
+
+    <p>This room teaches a powerful privilege escalation chain that combines multiple vulnerabilities and misconfigurations into a complete attack path. Here's the full breakdown:</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 1.25rem 0; font-size: 0.9rem;">
+        <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+                <th style="text-align: left; padding: 0.6rem 0.8rem; color: var(--accent);">Stage</th>
+                <th style="text-align: left; padding: 0.6rem 0.8rem; color: var(--accent);">Technique</th>
+                <th style="text-align: left; padding: 0.6rem 0.8rem; color: var(--accent);">Vulnerability</th>
+                <th style="text-align: left; padding: 0.6rem 0.8rem; color: var(--accent);">Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">1. Initial Access</td>
+                <td style="padding: 0.6rem 0.8rem;"><strong>NoSQL Injection</strong></td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">Unsanitised user input in MongoDB query</td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--warning);">Authentication bypass</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">2. Code Execution</td>
+                <td style="padding: 0.6rem 0.8rem;"><strong>EJS SSTI</strong></td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">User-controlled input in server-side template</td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--danger);">Remote Code Execution</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">3. Lateral Movement</td>
+                <td style="padding: 0.6rem 0.8rem;"><strong>Node.js --inspect Abuse</strong></td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">Debugger flag left enabled in production</td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--warning);">Escalation to <code>pipelinesvc</code></td>
+            </tr>
+            <tr>
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">4. Privilege Escalation</td>
+                <td style="padding: 0.6rem 0.8rem;"><strong>disk Group + debugfs</strong></td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--text-secondary);">Excessive group membership + raw device access</td>
+                <td style="padding: 0.6rem 0.8rem; color: var(--danger);">Full filesystem read → Root flag</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>🛡️ For Defenders</h3>
+    <ul style="color: var(--text-secondary); padding-left: 1.5rem; margin-bottom: 1rem;">
+        <li><strong>Sanitise database inputs.</strong> Always type-check and validate user input before passing it to database queries. Use parameterised queries or an ODM/ORM (like Mongoose for MongoDB) with strict schemas that reject unexpected object structures.</li>
+        <li><strong>Never trust template input.</strong> Pass user-controlled data into templates as <strong>variables</strong>, never as raw template code. Use sandboxed template engines or disable dangerous features like raw output (<code>&lt;%- %&gt;</code>) and <code>require</code> access in production.</li>
+        <li><strong>Disable debuggers in production.</strong> The <code>--inspect</code> flag is a development feature. It should <strong>never</strong> be present on production services. Use environment-specific startup scripts or process managers that strip debug flags in production environments.</li>
+        <li><strong>Audit group memberships.</strong> The <code>disk</code> group is extremely powerful — treat it with the same caution as <code>sudo</code> or <code>docker</code> group access. Regularly audit <code>/etc/group</code> and remove unnecessary memberships. Consider using filesystem encryption (LUKS/dm-crypt) so that raw disk access doesn't expose plaintext data.</li>
+        <li><strong>Apply the principle of least privilege.</strong> The <code>pipelinesvc</code> user had no legitimate reason to be in the <code>disk</code> group. Every unnecessary permission is a potential escalation path.</li>
+    </ul>
+
+    <h3>⚔️ For Attackers</h3>
+    <ul style="color: var(--text-secondary); padding-left: 1.5rem; margin-bottom: 1rem;">
+        <li><strong>Reconnaissance is everything.</strong> Nmap, Gobuster, and process enumeration (<code>pgrep -af</code>) revealed every step of this chain. Thorough enumeration turns a black box into a clear attack path.</li>
+        <li><strong>The briefing contained real hints.</strong> Room flavour text isn't just story — "a wallet signs a transaction its owner didn't authorise" was a direct clue toward NoSQL injection. Always read carefully.</li>
+        <li><strong><code>pgrep -af</code> catches what <code>ps aux | grep</code> misses.</strong> Always check full command lines when hunting running services. The <code>--inspect</code> flag would have been invisible to a standard <code>ps aux</code> pipe.</li>
+        <li><strong><code>disk</code> group + <code>debugfs</code> is a powerful escalation path.</strong> On Linux systems, raw device access is effectively root access. Always check group memberships — <code>disk</code>, <code>adm</code>, <code>docker</code>, <code>lxd</code> are all high-value targets.</li>
+        <li><strong>When one approach fails, understand why.</strong> <code>cat</code> failed (permissions), <code>strings</code> failed (no filesystem context). Understanding those failures directly pointed to <code>debugfs</code> — the tool that operates at the right abstraction level. The difference between a good attacker and a great one is understanding <em>why</em> things work or don't.</li>
+    </ul>
+
+    <div class="callout thinking">
+        <strong>🧠 The Core Lesson:</strong> This room is a perfect illustration of <strong>chained exploitation</strong>. No single vulnerability gave us root. We combined NoSQL injection, SSTI, an exposed debugger, and excessive group membership into a complete kill chain. In real-world penetration testing, it's rare to find a single silver-bullet vulnerability. Success comes from chaining smaller misconfigurations together — each one widening your access until you reach the objective.
+    </div>
+
+</section>
+
+<!-- ========== ATTACK CHAIN SUMMARY ========== -->
+<section>
+    <h2>🔗 Complete Attack Chain</h2>
+    <div class="attack-chain">
+        <span class="node">Nmap Recon</span>
+        <span class="arrow">→</span>
+        <span class="node">Gobuster</span>
+        <span class="arrow">→</span>
+        <span class="node">NoSQL Injection ($ne)</span>
+        <span class="arrow">→</span>
+        <span class="node">Session Hijack (/staff)</span>
+        <span class="arrow">→</span>
+        <span class="node">EJS SSTI (RCE)</span>
+        <span class="arrow">→</span>
+        <span class="node">Reverse Shell (poolside)</span>
+        <span class="arrow">→</span>
+        <span class="node">pgrep -af Discovery</span>
+        <span class="arrow">→</span>
+        <span class="node">node inspect :9229 (pipelinesvc)</span>
+        <span class="arrow">→</span>
+        <span class="node">disk Group Enumeration</span>
+        <span class="arrow">→</span>
+        <span class="node">debugfs Bypass</span>
+        <span class="arrow">→</span>
+        <span class="node flag">🏁 Root Flag</span>
+    </div>
+
+    <div class="flag-box" style="margin-top: 1.5rem;">
+        <div class="flag-label">🏖️ User Flag</div>
+        <div class="flag-value">THM{User_flag}</div>
+    </div>
+    <div class="flag-box">
+        <div class="flag-label">🏁 Root Flag</div>
+        <div class="flag-value">THM{r4w_d1sk_4cc3ss_w4s_t00_much}</div>
+    </div>
+</section>
+
+<!-- ========== REFERENCE ========== -->
+<section>
+    <h2>🔗 Reference</h2>
+    <p>This room is part of the <strong>Hacker Holidays 2026</strong> event on TryHackMe.</p>
+    <p style="text-align: center; margin: 1.5rem 0;">
+        <a href="https://tryhackme.com" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: var(--accent); color: #0f172a; padding: 0.75rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 1rem; transition: transform 0.15s ease, box-shadow 0.15s ease;">
+            🚀 Try the room on TryHackMe
+        </a>
+    </p>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<div class="footer">
+    <p>Day 7 — Hacker Holidays 2026 · The Byte Lotus Hotel · <strong>Do Not Disturb</strong></p>
+    <p>Write-up for educational purposes only. Complete the room yourself to earn the flags.</p>
+    <p style="margin-top: 0.5rem;">
+        <span>🐚</span> <span>🌴</span> <span>🥥</span> <span>🍦</span> <span>🍹</span>
+    </p>
+</div>
