@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/writeups.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
@@ -62,19 +62,21 @@
 
             <p>The story hints at a classic race condition: <em>"He came back to find the sunbed had been 'claimed' three times over while he wasn't looking."</em> This suggests we can fire off multiple simultaneous claim requests before the server locks us out.</p>
 
-            <!-- Screenshot: Register Page -->
-            <div class="code-block">
-                <div class="label">📸 Screenshot</div>
-                <pre>![Register Page](images/day8_screenshot1.png)</pre>
-            </div>
+            <p>We land at <code>http://10.113.154.86:3000</code> and create a guest account. The registration is straightforward — no email verification needed.</p>
 
-            <p>We land at <code>http://10.113.154.86:3000</code> and create a guest account. The registration is straightforward — no email verification needed. After logging in, we're redirected to the dashboard where we see our current tier and the dreaded 24-hour countdown timer.</p>
+            <!-- Screenshot: Register Page -->
+            <figure>
+                <img src="images/day8_screenshot1.png" alt="Register page for the Ponzi rewards app" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 Registering a new guest account</figcaption>
+            </figure>
+
+            <p>After logging in, we're redirected to the dashboard where we see our current tier, a "Claim Reward" button, and the dreaded 24-hour countdown timer.</p>
 
             <!-- Screenshot: Dashboard -->
-            <div class="code-block">
-                <div class="label">📸 Screenshot</div>
-                <pre>![Dashboard](images/day8_screenshot2.png)</pre>
-            </div>
+            <figure>
+                <img src="images/day8_screenshot2.png" alt="Dashboard showing the claim button and 24-hour timer" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 Dashboard — one claim per 24 hours? We'll see about that.</figcaption>
+            </figure>
         </section>
 
         <!-- Step 2: Intercepting the Claim -->
@@ -112,8 +114,8 @@ Connection: keep-alive</pre>
             <ol>
                 <li>Right-click the intercepted <code>POST /claim</code> request → <strong>Send to Repeater</strong></li>
                 <li>In Repeater, right-click the tab → <strong>Duplicate tab</strong> (do this 5–10 times)</li>
-                <li>Create a <strong>Request Group</strong> with all the duplicated tabs</li>
-                <li>Select "Send group in parallel" mode</li>
+                <li>Select all the duplicated tabs and add them to a <strong>group</strong></li>
+                <li>Choose <strong>"Send group in parallel"</strong> mode</li>
                 <li>Click <strong>Send</strong> to fire them all at once</li>
             </ol>
 
