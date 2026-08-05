@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏖️ Towel on the Sunbed — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🏖️🐚🌴🥥🍦🍹</div>
+            <h1>Towel on the Sunbed</h1>
+            <p class="subtitle">Ponzi set his towel down for one 24-hour reward claim. He came back to find the sunbed had been "claimed" three times over while he wasn't looking.</p>
+            <div class="room-meta">
+                <div class="badge">
+                    <span class="label">Room:</span> Hacker Holidays
+                </div>
+                <div class="badge">
+                    <span class="label">Category:</span> Web
+                </div>
+                <div class="badge">
+                    <span class="label">Difficulty:</span> Medium
+                </div>
+                <div class="badge">
+                    <span class="label">Time:</span> 45 min
+                </div>
+                <div class="badge">
+                    <span class="label">Points:</span> 90
+                </div>
+            </div>
+        </header>
+
+        <!-- Attack Chain Overview -->
+        <section>
+            <h2><span class="step-num">🗺️</span> Attack Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Register Account</div>
+                <span class="arrow">→</span>
+                <div class="node">Capture Claim Request</div>
+                <span class="arrow">→</span>
+                <div class="node">Send to Repeater</div>
+                <span class="arrow">→</span>
+                <div class="node">Duplicate 3+ Tabs</div>
+                <span class="arrow">→</span>
+                <div class="node">Send in Parallel</div>
+                <span class="arrow">→</span>
+                <div class="node flag">🏁 Flag</div>
+            </div>
+        </section>
+
+        <!-- Step 1: Reconnaissance -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance</h2>
+            
+            <p>We're dropped into a crypto rewards web app called <strong>Ponzi</strong> — a wellness rewards platform running poolside at the resort. The app offers daily reward claims, but users are limited to <strong>one claim every 24 hours</strong>. Our target is the <strong>Whale Vault</strong>, which requires multiple claims to access.</p>
+
+            <p>The story hints at a classic race condition: <em>"He came back to find the sunbed had been 'claimed' three times over while he wasn't looking."</em> This suggests we can fire off multiple simultaneous claim requests before the server locks us out.</p>
+
+            <!-- Screenshot: Register Page -->
+            <div class="code-block">
+                <div class="label">📸 Screenshot</div>
+                <pre>![Register Page](images/day8_screenshot1.png)</pre>
+            </div>
+
+            <p>We land at <code>http://10.113.154.86:3000</code> and create a guest account. The registration is straightforward — no email verification needed. After logging in, we're redirected to the dashboard where we see our current tier and the dreaded 24-hour countdown timer.</p>
+
+            <!-- Screenshot: Dashboard -->
+            <div class="code-block">
+                <div class="label">📸 Screenshot</div>
+                <pre>![Dashboard](images/day8_screenshot2.png)</pre>
+            </div>
+        </section>
+
+        <!-- Step 2: Intercepting the Claim -->
+        <section>
+            <h2><span class="step-num">2</span> Intercepting the Claim Request</h2>
+
+            <p>With Burp Suite running and intercept turned <strong>ON</strong>, we click the "Claim Reward" button on the dashboard. The captured request is beautifully simple:</p>
+
+            <div class="code-block">
+                <div class="label">POST /claim — Captured Request</div>
+                <pre>POST /claim HTTP/1.1
+Host: 10.113.154.86:3000
+Content-Length: 0
+Accept-Language: en-US,en;q=0.9
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36
+Accept: */*
+Origin: http://10.113.154.86:3000
+Referer: http://10.113.154.86:3000/dashboard
+Cookie: connect.sid=s%3A[your-session-token]
+Connection: keep-alive</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Key Observation:</strong> The request has <code>Content-Length: 0</code> — no CSRF token, no timestamp, no claim counter in the body. The server relies entirely on the session cookie to enforce the 24-hour limit. This is a <strong>TOCTOU (Time-of-Check, Time-of-Use)</strong> vulnerability waiting to be exploited.
+            </div>
+        </section>
+
+        <!-- Step 3: The Race -->
+        <section>
+            <h2><span class="step-num">3</span> The Race Condition</h2>
+
+            <p>Here's where we pull off the "towel on the sunbed" trick. The server checks if we've claimed in the last 24 hours, but if we fire multiple requests <strong>simultaneously</strong>, they all pass the check before any of them update the "last claimed" timestamp.</p>
+
+            <h3>🛠️ Burp Suite Setup</h3>
+            <ol>
+                <li>Right-click the intercepted <code>POST /claim</code> request → <strong>Send to Repeater</strong></li>
+                <li>In Repeater, right-click the tab → <strong>Duplicate tab</strong> (do this 5–10 times)</li>
+                <li>Create a <strong>Request Group</strong> with all the duplicated tabs</li>
+                <li>Select "Send group in parallel" mode</li>
+                <li>Click <strong>Send</strong> to fire them all at once</li>
+            </ol>
+
+            <div class="code-block">
+                <div class="label">Burp Repeater — Parallel Send</div>
+                <pre>┌─────────────────────────────────────────┐
+│  Tab 1: POST /claim  ──┐               │
+│  Tab 2: POST /claim  ──┤               │
+│  Tab 3: POST /claim  ──┼── Send Group  │
+│  Tab 4: POST /claim  ──┤   (parallel)  │
+│  Tab 5: POST /claim  ──┘               │
+└─────────────────────────────────────────┘</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">✅ All requests return HTTP 200 OK
+✅ Multiple "claim successful" responses
+✅ Dashboard now shows accumulated rewards beyond the daily limit</div>
+            </div>
+
+            <div class="callout success">
+                <strong>🎯 Why this works:</strong> The server's logic is: <em>check last_claim_time → if >24h → grant reward → update last_claim_time</em>. By sending requests in parallel, all 5 checks happen before any update occurs. Each request sees a "clean" 24-hour window and grants the reward. Classic TOCTOU race condition.
+            </div>
+        </section>
+
+        <!-- Step 4: The Flag -->
+        <section>
+            <h2><span class="step-num">4</span> Whale Vault & Flag</h2>
+
+            <p>After the parallel requests succeed, we refresh the dashboard. Our claim count has jumped past the threshold, unlocking access to the <strong>Whale Vault</strong>. Inside, the flag awaits.</p>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 Flag Captured</div>
+                <div class="flag-value">THM{FL4G_R3D4CT3D}</div>
+            </div>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2><span class="step-num">🛡️</span> Remediation Advice</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>TOCTOU Race Condition</strong></td>
+                        <td>Use database-level atomic operations (<code>UPDATE ... WHERE last_claim < NOW() - INTERVAL '24 hours'</code>) or pessimistic row locking</td>
+                    </tr>
+                    <tr>
+                        <td><strong>No CSRF Protection</strong></td>
+                        <td>Implement CSRF tokens on state-changing endpoints</td>
+                    </tr>
+                    <tr>
+                        <td><strong>No Rate Limiting</strong></td>
+                        <td>Add server-side rate limiting per session/IP</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Session-only Auth</strong></td>
+                        <td>Pair sessions with request signing for sensitive operations</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🏖️ <strong>Towel on the Sunbed</strong> — Hacker Holidays 2025</p>
+            <p><a href="https://tryhackme.com/room/hh-towelonthesunbed-61271709" target="_blank">TryHackMe Room</a> · Category: Web · Technique: Race Condition (TOCTOU)</p>
+        </footer>
+
+    </div>
+</body>
+</html>
