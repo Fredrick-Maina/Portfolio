@@ -33,7 +33,7 @@
 {
 "id": "RECON00_day0_hacker_holidays_2026 on TryHackMe",
 "title": "Hacker Holidays Day 0",
-"path": "writeups/day0_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day0_Hacker_Holidays_2026.html",
 "date": "01-08-2026",
 "isExternal": false
 },
@@ -43,7 +43,7 @@
 "title": "Hacker Holidays Day 3",
 "platform": "TryHackMe",
 "category": "AWS / Cloud Security",
-"path": "writeups/day3_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day3_Hacker_Holidays_2026.html",
 "date": "30-07-2026",
 "isExternal": false
 },
@@ -51,7 +51,7 @@
 {
 "id": "Packed_Light_day4_hacker_holidays_2026 on TryHackMe",
 "title": "Hacker Holidays Day 4",
-"path": "writeups/day4_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day4_Hacker_Holidays_2026.html",
 "date": "31-07-2026",
 "isExternal": false
 },
@@ -59,7 +59,7 @@
 {
 "id": "Beach_Bar_day5_hacker_holidays_2026 on TryHackMe",
 "title": "Hacker Holidays Day 5",
-"path": "writeups/day5_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day5_Hacker_Holidays_2026.html",
 "date": "01-08-2026",
 "isExternal": false
 },
@@ -67,7 +67,7 @@
 {
 "id": "Overheard_at_Breakfast_day6_hacker_holidays_2026 on TryHackMe",
 "title": "Hacker Holidays Day 6",
-"path": "writeups/day6_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day6_Hacker_Holidays_2026.html",
 "date": "01-08-2026",
 "isExternal": false
 },
@@ -75,7 +75,7 @@
 {
 "id": "Do_Not_Disturb_day7_hacker_holidays_2026 on TryHackMe",
 "title": "Hacker Holidays Day 7",
-"path": "writeups/day7_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day7_Hacker_Holidays_2026.html",
 "date": "05-08-2026",
 "isExternal": false
 },
@@ -83,7 +83,7 @@
 {
 "id": "Towel_on_the_Sunbed_day8_hacker_holidays on TryHackMe",
 "title": "Hacker Holidays Day 8",
-"path": "writeups/day8_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day8_Hacker_Holidays_2026.html",
 "date": "05-08-2026",
 "isExternal": false
 },
@@ -91,7 +91,7 @@
 {
 "id": "CryptoCabana_day9_hacker_holidays on TryHackMe",
 "title": "Hacker Holidays day 9",
-"path": "writeups/day9_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day9_Hacker_Holidays_2026.html",
 "date": "06-08-2026",
 "isExternal": false
 },
@@ -99,7 +99,7 @@
 {
 "id": "The_Hollow_Shell_day10_hacker_holidays on TryHackMe",
 "title": "Hacker Holidays Day 10",
-"path": "writeups/day10_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day10_Hacker_Holidays_2026.html",
 "date": "07-08-2026",
 "isExternal": false
 },
@@ -107,7 +107,7 @@
 {
 "id": "Infinity_Pool_day11_hacker_holidays on TryHackMe",
 "title": "Hacker Holidays Day 11",
-"path": "writeups/day11_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day11_Hacker_Holidays_2026.html",
 "date": "07-08-2026",
 "isExternal": false
 },
@@ -115,7 +115,7 @@
 {
 "id": "After_Hours_day12_hacker_holidays on TryHackMe",
 "title": "Hacker Holidays Day 12",
-"path": "writeups/day12_Hacker_Holidays_2026.html",
+"path": "writeups/HACKER_HOLIDAYS_2026/day12_Hacker_Holidays_2026.html",
 "date": "07-08-2026",
 "isExternal": false
 }
