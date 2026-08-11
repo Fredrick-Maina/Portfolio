@@ -33,6 +33,21 @@ def main():
     # check git repo
     run_git("rev-parse" , "--is-inside-work-tree")
 
+    print("Updating static JSON fallbacks for projects and documents...")
+    # Update projects.json
+    subprocess.run("mkdir -p projects && curl -s 'https://api.github.com/users/Fredrick-Maina/repos?sort=updated' > projects/projects.json", shell=True)
+    # Update documents.json
+    subprocess.run('''node -e '
+const fs = require("fs");
+const docs = fs.readdirSync("./Documents").filter(f => f !== "resume.pdf" && f !== "documents.json");
+const docData = docs.map(d => ({
+    name: d,
+    download_url: "Documents/" + d,
+    view_url: "Documents/" + d
+}));
+fs.writeFileSync("./Documents/documents.json", JSON.stringify(docData, null, 2));'
+''', shell=True)
+
     #check for changes
     status = run_git("status", "--porcelain")
 

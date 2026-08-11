@@ -243,11 +243,23 @@ async function fetchGitHubRepos() {
         } else if (data.message && data.message.includes("API rate limit")) {
             console.error("GitHub API Rate Limit Exceeded");
         }
-        return [];
     } catch (e) {
         console.error("Error fetching GitHub repos:", e);
-        return [];
     }
+
+    // Fallback to local static JSON if API fails
+    try {
+        const fallbackResponse = await fetch('projects/projects.json');
+        const fallbackData = await fallbackResponse.json();
+        if (Array.isArray(fallbackData)) {
+            cachedRepos = fallbackData.filter(repo => !repo.fork);
+            return cachedRepos;
+        }
+    } catch (e) {
+        console.error("Failed to load projects/projects.json fallback", e);
+    }
+    
+    return [];
 }
 
 async function fetchDocs() {
@@ -258,35 +270,22 @@ async function fetchDocs() {
         try {
             const { data, timestamp } = JSON.parse(localCache);
             if (Date.now() - timestamp < CACHE_DURATION) {
-                cachedDocs = data.map(d => ({
-                    name: d.name,
-                    download_url: d.download_url || d.url,
-                    view_url: d.view_url || `Documents/${d.name}`
-                }));
+                cachedDocs = data;
                 return cachedDocs;
             }
         } catch (e) {}
     }
 
     try {
-        const response = await fetch(
-            `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/Documents`, {
-            headers: { "Accept": "application/vnd.github.v3+json" }
-        });
+        const response = await fetch('Documents/documents.json');
         const data = await response.json();
         if (Array.isArray(data)) {
-            cachedDocs = data
-                .filter(file => file.type === "file")
-                .map(file => ({ 
-                    name: file.name, 
-                    download_url: file.download_url,
-                    view_url: `Documents/${file.name}` 
-                }));
+            cachedDocs = data;
             localStorage.setItem('github_docs', JSON.stringify({ data: cachedDocs, timestamp: Date.now() }));
             return cachedDocs;
         }
     } catch (e) {
-        console.error("Error fetching documents:", e);
+        console.error("Error fetching Documents/documents.json:", e);
     }
 
     return [];
