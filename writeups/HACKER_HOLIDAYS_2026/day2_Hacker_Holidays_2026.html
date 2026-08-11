@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚪 Room 404 — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🚪🔍📂💻🏁</div>
+            <h1>Room 404</h1>
+            <p class="subtitle">He booked the quiet room. It's not on the floor plan, not in the brochure, not on any door. But port 8080 is wide open, and the rooms it never lists are the ones worth finding.</p>
+            <div class="room-meta">
+                <div class="badge">
+                    <span class="label">Room:</span> Hacker Holidays
+                </div>
+                <div class="badge">
+                    <span class="label">Category:</span> Web
+                </div>
+                <div class="badge">
+                    <span class="label">Difficulty:</span> Very Easy
+                </div>
+                <div class="badge">
+                    <span class="label">Time:</span> 30 min
+                </div>
+                <div class="badge">
+                    <span class="label">Points:</span> 30
+                </div>
+            </div>
+        </header>
+
+        <!-- Attack Chain Overview -->
+        <section>
+            <h2><span class="step-num">🗺️</span> Attack Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Port 8080 Discovered</div>
+                <span class="arrow">→</span>
+                <div class="node">Gobuster Enumeration</div>
+                <span class="arrow">→</span>
+                <div class="node">.git/HEAD Found (200)</div>
+                <span class="arrow">→</span>
+                <div class="node">git-dumper Downloads Repo</div>
+                <span class="arrow">→</span>
+                <div class="node">cat README.md</div>
+                <span class="arrow">→</span>
+                <div class="node flag">🏁 Flag</div>
+            </div>
+        </section>
+
+        <!-- Step 1: Reconnaissance -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance — What's on Port 8080?</h2>
+
+            <p>The target is served on port <strong>8080</strong> — an alternate HTTP port often used for development, staging, or internal tools. The room description hints that <em>"rooms it never lists are the ones worth finding"</em> — we need to look for hidden directories.</p>
+
+            <p>Our tool of choice is <strong>Gobuster</strong>, a fast directory brute-forcer that tests each word in a wordlist against the target URL to find hidden paths:</p>
+
+            <div class="code-block">
+                <div class="label">Gobuster — Directory Brute Force</div>
+                <pre>gobuster dir -u http://10.114.131.54:8080 -w /usr/share/wordlists/dirb/common.txt -t 50</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Gobuster flags:</strong>
+                <ul>
+                    <li><code>dir</code> — Directory/file enumeration mode</li>
+                    <li><code>-u</code> — Target URL</li>
+                    <li><code>-w</code> — Path to wordlist</li>
+                    <li><code>-t 50</code> — 50 concurrent threads for speed</li>
+                </ul>
+            </div>
+
+            <div class="code-block">
+                <div class="output">/.git/HEAD            (Status: 200) [Size: 21]</div>
+            </div>
+
+            <div class="callout success">
+                <strong>🚨 Critical finding:</strong> <code>.git/HEAD</code> returned HTTP <strong>200 OK</strong>. This means the entire Git repository — including all source code, commit history, and any secrets ever committed — is publicly accessible over HTTP. The developers deployed their staging repository to production without removing the <code>.git</code> folder.
+            </div>
+        </section>
+
+        <!-- Step 2: Understanding Git Exposure -->
+        <section>
+            <h2><span class="step-num">2</span> Understanding the Vulnerability — Exposed .git</h2>
+
+            <h3>What is the .git Directory?</h3>
+
+            <p>Every Git repository has a hidden <code>.git</code> folder at its root. This folder contains the <strong>entire version history</strong> of the project — every file ever created, every change ever made, every commit message, and every branch. Think of it as a complete time machine for the codebase.</p>
+
+            <p>The <code>.git</code> folder contains:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Path</th>
+                        <th>Contains</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>.git/HEAD</code></td>
+                        <td>Points to the current branch (e.g., <code>refs/heads/main</code>)</td>
+                    </tr>
+                    <tr>
+                        <td><code>.git/refs/</code></td>
+                        <td>References to all branches and tags</td>
+                    </tr>
+                    <tr>
+                        <td><code>.git/objects/</code></td>
+                        <td>All files, commits, and trees — the entire history compressed</td>
+                    </tr>
+                    <tr>
+                        <td><code>.git/logs/</code></td>
+                        <td>History of where each branch has pointed</td>
+                    </tr>
+                    <tr>
+                        <td><code>.git/config</code></td>
+                        <td>Repository configuration — may contain credentials or remotes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Why This Happens</h3>
+
+            <p>When you deploy a web application, you copy files to the production server. If you copy the <strong>entire project directory</strong> — including the hidden <code>.git</code> folder — the version control history becomes publicly accessible. Common causes:</p>
+
+            <ul>
+                <li>Using <code>cp -r</code> or <code>rsync</code> without excluding <code>.git</code></li>
+                <li>Deploying directly from a Git working directory</li>
+                <li>CI/CD pipelines that don't strip development files</li>
+                <li>Developers who clone the repo directly into the web root</li>
+            </ul>
+
+            <div class="callout thinking">
+                <strong>🔑 What makes this dangerous:</strong> Even if you remove a secret from the <em>current</em> version of a file, it still exists in the Git history. A file that said <code>password: hunter2</code> three commits ago and now says <code>password: [REDACTED]</code> is still compromised — anyone with access to <code>.git</code> can rewind time and see the original password.
+            </div>
+        </section>
+
+        <!-- Step 3: Dumping the Repository -->
+        <section>
+            <h2><span class="step-num">3</span> Dumping the Repository with git-dumper</h2>
+
+            <p>While we could manually fetch individual Git objects with <code>curl</code>, a tool called <strong>git-dumper</strong> automates the process — it reconstructs the entire repository from the exposed <code>.git</code> directory:</p>
+
+            <div class="code-block">
+                <div class="label">Install git-dumper</div>
+                <pre>git clone https://github.com/arthaud/git-dumper.git
+cd git-dumper
+pip install -r requirements.txt</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">Dump the Repository</div>
+                <pre>python3 git_dumper.py http://10.114.131.54:8080/.git/ ./room404/</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">[-] Fetching .git/HEAD ... OK
+[-] Fetching .git/refs/heads/main ... OK
+[-] Fetching .git/objects/ ... OK
+[-] Rebuilding repository ... Done
+[+] Repository successfully dumped to ./room404/</div>
+            </div>
+
+            <p>The tool walks through the Git object tree, downloading every file, commit, and reference, then reconstructs a complete working repository locally — giving us the full source code and version history.</p>
+        </section>
+
+        <!-- Step 4: Finding the Flag -->
+        <section>
+            <h2><span class="step-num">4</span> Finding the Flag</h2>
+
+            <p>With the repository reconstructed, we explore its contents:</p>
+
+            <div class="code-block">
+                <div class="label">Explore the Dumped Repository</div>
+                <pre>cd room404
+ls -la</pre>
+            </div>
+
+            <p>The repository contains standard project files — and a <strong>README.md</strong>. Let's read it:</p>
+
+            <div class="code-block">
+                <div class="label">Read the README</div>
+                <pre>cat README.md</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output"># Byte Lotus — Guest Experience Platform
+
+Internal staging repository for the guest app and concierge personalization
+service. Do not deploy this folder to production.
+
+Staging flag (remove before launch): THM{REDACTED}</div>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 Flag Captured</div>
+                <div class="flag-value">THM{REDACTED}</div>
+            </div>
+
+            <div class="callout success">
+                <strong>🎯 The irony:</strong> The README literally says <em>"remove before launch"</em> next to the flag — and <em>"Do not deploy this folder to production"</em> in the description. Both instructions were ignored. The <code>.git</code> folder was deployed to production, and the staging flag was never removed.
+            </div>
+        </section>
+
+        <!-- Step 5: Why Room 404? -->
+        <section>
+            <h2><span class="step-num">5</span> Why "Room 404"? — The Double Meaning</h2>
+
+            <p>The room name is a clever double pun:</p>
+
+            <ul>
+                <li><strong>HTTP 404 Not Found:</strong> The standard response code for missing pages. The flag was in a file the developers thought was "hidden" — but it was very much findable.</li>
+                <li><strong>The room not on the floor plan:</strong> Just like the hotel room that doesn't appear on any map, the <code>.git</code> directory isn't visible on the website — but it exists, and it's accessible if you know where to look.</li>
+            </ul>
+
+            <p>The concierge briefing put it perfectly: <em>"the rooms it never lists are the ones worth finding."</em></p>
+        </section>
+
+        <!-- Summary -->
+        <section>
+            <h2><span class="step-num">📋</span> Summary</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Step</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>Directory Enumeration</td>
+                        <td>Gobuster found <code>.git/HEAD</code> returning 200 OK</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>Repository Dump</td>
+                        <td>Used <code>git-dumper</code> to reconstruct the full Git repository</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>Flag Discovery</td>
+                        <td><code>cat README.md</code> revealed the staging flag that was never removed</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2><span class="step-num">🛡️</span> Remediation Advice</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>.git directory deployed to production</strong></td>
+                        <td>Configure deployment scripts to exclude <code>.git</code>. Use <code>.dockerignore</code>, <code>.gitignore</code> deployment rules, or build artifacts that strip version control files.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Secrets in repository history</strong></td>
+                        <td>Never commit secrets. Use environment variables or a secrets manager. If a secret was ever committed, consider the repository compromised — rotate the secret and rewrite history with <code>git filter-branch</code> or <code>BFG Repo-Cleaner</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Staging artifacts in production</strong></td>
+                        <td>Use separate build pipelines for staging and production. Production builds should strip debug flags, test credentials, and development notes.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Block access to .git via web server</strong></td>
+                        <td>Add a rule to deny access to hidden files: in Apache, use <code>&lt;FilesMatch "^\\."&gt; Deny from all &lt;/FilesMatch&gt;</code>; in Nginx, use <code>location ~ /\\. { deny all; }</code>.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🚪 <strong>Room 404</strong> — Hacker Holidays 2025</p>
+            <p><a href="https://tryhackme.com/room/hh-room404-804573bf" target="_blank">TryHackMe Room</a> · Category: Web · Techniques: Gobuster Directory Enumeration, Exposed .git Repository, git-dumper, Source Code Analysis</p>
+        </footer>
+
+    </div>
+</body>
+</html>
