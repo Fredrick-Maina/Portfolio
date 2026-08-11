@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr Robot CTF Walkthrough — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/writeups.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🔍💻🚀</div>
+            <h1>Mr Robot CTF Walkthrough</h1>
+            <p class="subtitle">TryHackMe Room Walkthrough</p>
+        </header>
+
+        <section>
+            <p>Of course. Here is a complete write-up of the process used to compromise the Mr. Robot machine and
+  capture all three flags.</p>
+            <p>---</p>
+            <p>Mr. Robot CTF (TryHackMe) Walkthrough</p>
+            <p>This report documents the step-by-step process of gaining initial access, escalating privileges to
+  the robot user, and finally achieving root access on the Mr. Robot virtual machine.</p>
+            <p>---</p>
+            <p>Phase 1: Initial Access & Finding Flag 1</p>
+            <p>The initial vector was the WordPress login page on the web server.</p>
+            <p>1. Brute-Force Attack: A hydra brute-force attack was attempted on the /wp-login.php page for the
+      user mrrobot. The initial command produced false positives, indicating every password was valid.</p>
+            <p>2. Identifying the Failure Condition: To correct this, we inspected the server's response to a
+      failed login attempt. The goal was to find a unique string that only appears on failure. The curl
+      command was used for this:</p>
+            <p>1     curl -s -d "log=mrrobot&pwd=wrongpassword&wp-submit=Log+In" -i http://10.81.155.36/wp-login.ph
+      The response contained the error message: "The password you entered for the username mrrobot is
+  incorrect."</p>
+            <p>3. Corrected Brute-Force: The hydra command was updated to use the correct POST parameters (log and
+      pwd) and the correct failure string (F=The password you entered). This allowed Hydra to
+      successfully identify the password for the mrrobot user.</p>
+            <p>1     hydra -l mrrobot -P rockyou.txt 10.81.155.36 http-post-form
+     "/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log+In:F=The password you entered"</p>
+            <p>4. Finding Flag 1: After logging into the WordPress site as mrrobot, the first flag (key-1-of-3.txt)
+      was located.</p>
+            <p>---</p>
+            <p>Phase 2: User Privilege Escalation (daemon → robot) & Finding Flag 2</p>
+            <p>After initial access, a reverse shell was obtained as the low-privilege daemon user. The goal was to
+  escalate to a real user account.</p>
+            <p>1. Enumeration as `daemon`: An automated enumeration script (linpeas.sh) or manual file searching
+      revealed a highly suspicious file:
+       * /home/robot/password.raw-md5</p>
+            <p>2. Cracking the User's Password: The contents of this file were read, revealing a 32-character MD5
+      hash.</p>
+            <p>1     cat /home/robot/password.raw-md5
+   2     # Output: <32-character-md5-hash>
+      This hash was taken to an online MD5 cracking service (e.g., CrackStation), which successfully
+  reversed it to a plaintext password.</p>
+            <p>3. Switching Users: With the cracked password, we switched from the daemon user to the robot user.</p>
+            <p>1     su robot
+   2     # (Enter the cracked password)</p>
+            <p>4. Finding Flag 2: Upon becoming the robot user, the second flag (key-2-of-3.txt) was found in the
+      user's home directory (/home/robot).</p>
+            <p>---</p>
+            <p>Phase 3: Root Privilege Escalation (robot → root) & Finding Flag 3</p>
+            <p>Now operating as robot, the final step was to gain root access.</p>
+            <p>1. Enumeration as `robot`: The enumeration process was repeated. We specifically checked for SUID
+      binaries, which are programs that run with the permissions of their owner (root) rather than the
+      user who executes them.
+   1     find / -perm -u=s -type f 2>/dev/null</p>
+            <p>2. Identifying SUID Vulnerability: The search results revealed a critical misconfiguration:
+       * /usr/local/bin/nmap
+      The nmap binary had SUID permissions, which is a known insecure configuration. Older versions of
+  nmap have an "interactive mode" that can be abused to execute shell commands.</p>
+            <p>3. Exploiting SUID `nmap`: We launched nmap's interactive mode and then used it to spawn a shell.
+      Because nmap was running as root, the shell it spawned also had root privileges.</p>
+            <p>1     # Step 1: Launch nmap in interactive mode
+   2     /usr/local/bin/nmap --interactive
+   3
+   4     # Step 2: At the nmap> prompt, execute a shell
+   5     nmap> !sh</p>
+            <p>4. Root Access and Final Flag: After executing !sh, we gained a root shell.</p>
+            <p>1     # Confirm root access
+   2     whoami
+   3     # Output: root
+   4
+   5     # Find the final flag
+   6     ls -la /root
+   7     cat /root/key-3-of-3.txt
+  The third and final flag was located and read from the /root directory, completing the challenge.</p>
+
+        </section>
+    </div>
+</body>
+</html>

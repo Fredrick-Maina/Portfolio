@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAV Walkthrough — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/writeups.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🔍💻🚀</div>
+            <h1>DAV Walkthrough</h1>
+            <p class="subtitle">TryHackMe Room Walkthrough</p>
+        </header>
+
+        <section>
+            <p>DAV write-up</p>
+            <p>a simple ping to make sure the host is up, this is after connecting to the VPN if you are using your own machine.</p>
+            <p>Disclaimer: The IP changes every time you start the machine.</p>
+            <p>Then</p>
+            <p>nmap -T4 -sVC <MACHINE_IP></p>
+            <p>This is what it yielded.</p>
+            <p>Only port 80 is open. Even after using the Nmap tag -p- only this port was open.</p>
+            <p>From here we pivot, to directory enumeration because the page is a default landing page for the Apache2 server.</p>
+            <p>gobuster -u <url> -w <path_to_Wordlist(common.txt)></p>
+            <p>Interesting find here is the webdav  directory. Navigate to it and it prompts us to sign in.</p>
+            <p>Username and password. A simple google search should do the trick</p>
+            <p>userrname: wampp</p>
+            <p>password: xampp</p>
+            <p>After a little research, I found there is a command line tool for signing into webdav. Cadaver, let’s pivot</p>
+            <p>cadaver <http://machine_ip/webdav/></p>
+            <p>we already know the username and password.</p>
+            <p>You can actually upload something. Through the ‘put’ command.</p>
+            <p>This was easy. I have a reverse shell in my working dir, I changed the IP to point to the tun0 one. And the port to 4242 for this challenge.</p>
+            <p>Command:  put shell.php</p>
+            <p>refreshed the site. And saw the file there</p>
+            <p>setup my listener: nc -lvnp 4242</p>
+            <p>tried opening the file on the site and bam! I got a shell</p>
+            <p>first command after getting shell for me is:  whoami</p>
+            <p>Just to verify I got a reverse shell.</p>
+            <p>Now let’s find the goodies(flags)</p>
+            <p>user.txt in the user’s dir, read it. Simple: 449b40fe93f78a938523b7e4dcd66d2a</p>
+            <p>sudo -l</p>
+            <p>to see what we can do with this user. Finds we can run the cat command as user. Now I went the easy way which is reading the root.txt file using sudo cat, but we can also find the root’s password in let’s say /etc/passwd, crack it and then log in as the roor, then find the flag.</p>
+            <p>sudo cat /root/root.txt</p>
+            <p>101101ddc16b0cdf65ba0b8a7af7afa5</p>
+            <p>This gets the job done.</p>
+
+        </section>
+    </div>
+</body>
+</html>

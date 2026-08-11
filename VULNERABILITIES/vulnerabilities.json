@@ -1,0 +1,18 @@
+[
+  "SAS-Token-in-Client-side-JavaScript.md",
+  "WMI-Event-Subscription-Peristence-with-Embedded-Fileless-Payload.md",
+  "api-key-in-voicemail.md",
+  "command-injection-shell-true.md",
+  "credentials-in-blob-storage.md",
+  "default-credentials-not-rotated.md",
+  "hardcoded-template-credentials.md",
+  "html-comment-credential-leak.md",
+  "loopback-service-without-auth.md",
+  "overly-permissive-sas-scope.md",
+  "race-condition-toctou.md",
+  "secret-rotation-without-clean.md",
+  "self-documenting-health-endpoint.md",
+  "unauthenticated-api-credential-leak.md",
+  "worker-running-as-root.md",
+  "zip-slip-path-traversal.md"
+]

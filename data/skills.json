@@ -1,0 +1,8 @@
+[
+    { "name": "Cybersecurity Fundamentals", "stars": "★★★★★" },
+    { "name": "Penetration Testing Basics", "stars": "★★★★☆" },
+    { "name": "Python (Scripting & Automation)", "stars": "★★★☆☆" },
+    { "name": "Linux Expert (Kali Linux, CLI)", "stars": "★★★★★" },
+    { "name": "Networking Fundamentals (TCP/IP, DNS, HTTP/HTTPS)", "stars": "★★★★☆" },
+    { "name": "Data Handling & Analysis", "stars": "★★★★★" }
+]

