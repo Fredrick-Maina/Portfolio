@@ -1,4 +1,11 @@
 [
+{
+"id": "WhyHackMe room on TryHackMe",
+"title": "WhyHackMe",
+"path": "writeups/TRYHACKME/whyhackme.html",
+"date": "16-08-2026",
+"isExternal": false
+},
     {
         "id": "Vulnversity Walkthrough on TryHackMe",
         "title": "Vulnversity",

