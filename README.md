@@ -29,6 +29,7 @@ One of its standout features is automatic GitHub integration, allowing the portf
 * 🌐 GitHub API integration
 * 🔄 Automatically displays the five most recently updated GitHub repositories
 * 📱 Responsive layout for desktop, tablet, and mobile devices
+* Easter Egg hidden in the secret.vault
 
 ---
 
