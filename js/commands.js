@@ -249,13 +249,8 @@ const COMMANDS = {
                 });
                 
                 if (found) {
-                    if (found.isExternal) {
-                        window.open(found.path, '_blank');
-                        return `<span class="accent">[ REDIRECTING ]</span> Opening external report in a new tab...`;
-                    }
-                    const contentResponse = await fetch(found.path);
-                    const text = await contentResponse.text();
-                    return `<pre class="output-line">${escapeHtml(text)}</pre>`;
+                    window.open(found.path, '_blank');
+                    return `<span class="accent">[ OPENING WRITEUP ]</span> Opening <strong>${escapeHtml(found.title)}</strong> report in a new tab...`;
                 }
             } catch (e) {}
         }
