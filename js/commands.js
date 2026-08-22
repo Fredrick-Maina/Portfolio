@@ -154,7 +154,7 @@ const COMMANDS = {
 
     ls: async () => {
         const files = await getFilesForDir(currentDir);
-        return files.join("    ");
+        return files.map(f => escapeHtml(f)).join("<br>");
     },
 
     cd: async (args) => {
