@@ -1,0 +1,16 @@
+[
+    "Over 90% of cyber attacks and data breaches start with a phishing email targeting an individual.",
+    "The first computer virus created was 'Creeper' in 1971, which displayed the message: 'I'm the creeper, catch me if you can!'",
+    "SQL Injection (SQLi) has remained one of the top web application vulnerabilities for over two decades.",
+    "Multifactor Authentication (MFA) can block up to 99.9% of automated account compromise attacks according to security researchers.",
+    "Human error accounts for over 80% of reported data breaches globally.",
+    "The term 'Bug' in software was popularized in 1947 when Grace Hopper found a real moth trapped in a Harvard Mark II computer relay.",
+    "In 2010, the Stuxnet worm targeted industrial control systems (PLCs), becoming one of the most sophisticated cyber weapons ever built.",
+    "Default passwords like '123456' and 'admin' remain among the most commonly abused entry points for IoT botnets.",
+    "Buffer Overflow attacks occur when data written to a buffer exceeds its capacity, overwriting adjacent memory locations.",
+    "Cross-Site Scripting (XSS) allows attackers to inject malicious scripts into trusted websites viewed by other users.",
+    "Zero-day vulnerabilities refer to security flaws that are unknown to the software vendor and have no patch available yet.",
+    "Public Wi-Fi networks without encryption make users susceptible to Man-in-the-Middle (MitM) eavesdropping attacks.",
+    "Ransomware attacks encrypt victim files and demand payment; regular offline backups are one of the most effective defenses against them.",
+    "Password hashing with salt prevents rainbow table attacks by adding unique random data before hashing."
+]

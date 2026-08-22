@@ -14,8 +14,9 @@ const COMMANDS = {
         <div class="cmd-name">certs</div><div class="cmd-desc">View professional certifications</div>
         <div class="cmd-name">resume</div><div class="cmd-desc">View or download my resume</div>
         <div class="cmd-name">cd</div><div class="cmd-desc">Change directory (e.g., cd projects)</div>
+        <div class="cmd-name">pwd</div><div class="cmd-desc">Print working directory</div>
         <div class="cmd-name">ls</div><div class="cmd-desc">List files in current directory</div>
-        <div class="cmd-name">cat</div><div class="cmd-desc">Read a file (e.g., cat ghostcat.txt)</div>
+        <div class="cmd-name">cat</div><div class="cmd-desc">Read a file (e.g., cat secret.vault)</div>
         <div class="cmd-name">history</div><div class="cmd-desc">View command history</div>
         <div class="cmd-name">contact</div><div class="cmd-desc">Ways to reach me</div>
         <div class="cmd-name">whoami</div><div class="cmd-desc">Display current user info</div>
@@ -149,6 +150,8 @@ const COMMANDS = {
 
     whoami: () => `guest_user@portfolio_v2`,
 
+    pwd: () => `/home/fred${currentDir}`,
+
     ls: async () => {
         const files = await getFilesForDir(currentDir);
         return files.join("    ");
@@ -187,7 +190,23 @@ const COMMANDS = {
         if (currentDir === "/") {
             if (file === "about.txt") return COMMANDS.about();
             if (file === "contact.md") return COMMANDS.contact();
-            if (file === "secret.vault") return `<span class="error">File is encrypted. Use 'unlock secret.vault &lt;password&gt;' to access.</span>`;
+            if (file === "secret.vault") {
+                return `
+<div class="stack">
+    <div class="accent">===================================================</div>
+    <div class="accent">   [ RESTRICTED AREA: CYBER SECURITY CHALLENGE ]   </div>
+    <div class="accent">===================================================</div>
+    <br>
+    <div><strong>STATUS:</strong> <span style="color:#ef4444;">LOCKED</span></div>
+    <div><strong>HINT:</strong> Decrypt the cipher below to reveal the vault passkey.</div>
+    <br>
+    <div style="background:#0f172a; padding:10px; border-left:3px solid #38bdf8; font-family:monospace;">
+        ROT13 Cipher: <strong>unpxvat</strong>
+    </div>
+    <br>
+    <div>Once solved, type: <span class="accent">unlock secret.vault &lt;passkey&gt;</span></div>
+</div>`;
+            }
             if (file === "projects" || file === "writeups" || file === "documents" || file === "vulnerabilities") return `<span class="error">cat: ${escapeHtml(file)}: Is a directory</span>`;
         }
 
@@ -270,15 +289,21 @@ const COMMANDS = {
 
         if (password === "hacking") {
             return `
-<div class="accent">[ ACCESS GRANTED ]</div>
-<br>
-Congratulations! You've found the hidden vault. 
-"The matrix is everywhere. It is all around us. Even now, in this very room."
-<br><br>
-You've demonstrated the first rule of security: curiosity.
-Keep exploring.`;
+<div class="stack">
+    <div class="accent">===================================================</div>
+    <div class="accent">    [ ACCESS GRANTED - SECRET VAULT UNLOCKED ]     </div>
+    <div class="accent">===================================================</div>
+    <br>
+    <p>🎉 <strong>Congratulations!</strong> You solved the ROT13 challenge key.</p>
+    <p><em>"The matrix is everywhere. It is all around us. Even now, in this very room."</em></p>
+    <br>
+    <div><strong>EASTER EGG BADGE:</strong> 🏆 <code>CYBER_EXPLORER_LEVEL_1</code></div>
+    <div>You've demonstrated key security mindset traits: <strong>curiosity & cryptanalysis</strong>.</div>
+    <br>
+    <div>Keep hunting and exploring!</div>
+</div>`;
         }
-        return `<span class="error">Invalid password. Access denied.</span>`;
+        return `<span class="error">Access Denied: Incorrect vault key. Decode the ROT13 cipher in secret.vault.</span>`;
     },
 
     history: () => {
