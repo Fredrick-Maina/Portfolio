@@ -1,6 +1,14 @@
 [
 
 {
+"id": "Agent P Room on TryHackMe",
+"title": "Agent P on THM",
+"path": "writeups/TRYHACKME/Agent_P.html"
+"date": "12-09-2026",
+"isExternal": false
+},
+
+{
 "id": "Blue Room on TryHackMe",
 "title": "Blue on THM",
 "path": "writeups/TRYHACKME/TryHackMe_Blue_Writeup.html",
