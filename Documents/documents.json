@@ -40,9 +40,19 @@
     "view_url": "Documents/Fredrick_Maina_Getting_Started_with_Cisco_Packet_Tracer_certificate.pdf"
   },
   {
+    "name": "SRC-WBN-261007-017_Fredrick_Maina.pdf",
+    "download_url": "Documents/SRC-WBN-261007-017_Fredrick_Maina.pdf",
+    "view_url": "Documents/SRC-WBN-261007-017_Fredrick_Maina.pdf"
+  },
+  {
     "name": "THM-HACKER-HOLIDAYS.pdf",
     "download_url": "Documents/THM-HACKER-HOLIDAYS.pdf",
     "view_url": "Documents/THM-HACKER-HOLIDAYS.pdf"
+  },
+  {
+    "name": "THM-K5UBXBECFA.pdf",
+    "download_url": "Documents/THM-K5UBXBECFA.pdf",
+    "view_url": "Documents/THM-K5UBXBECFA.pdf"
   },
   {
     "name": "THM-SEEPJFNCGW.pdf",
@@ -53,5 +63,10 @@
     "name": "TryHackMe_Blue_Penetration_Testing_Report.pdf",
     "download_url": "Documents/TryHackMe_Blue_Penetration_Testing_Report.pdf",
     "view_url": "Documents/TryHackMe_Blue_Penetration_Testing_Report.pdf"
+  },
+  {
+    "name": "dojo-certificate-0xDrrr3xpl01t.pdf",
+    "download_url": "Documents/dojo-certificate-0xDrrr3xpl01t.pdf",
+    "view_url": "Documents/dojo-certificate-0xDrrr3xpl01t.pdf"
   }
 ]
