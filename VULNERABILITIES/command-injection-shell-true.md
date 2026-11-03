@@ -1,4 +1,3 @@
-'``markdown
 # Command Injection via shell=True
 
 **Tags:** `#injection` `#python` `#rce` `#input-validation`
@@ -87,4 +86,3 @@ Output: `uid=1001(web) gid=1001(web)`
 
 - Command Injection in Automation Worker — same room, same pattern but running as root on port 9000
 - Loopback Service Without Authentication — how we pivoted from this shell to internal services
-```

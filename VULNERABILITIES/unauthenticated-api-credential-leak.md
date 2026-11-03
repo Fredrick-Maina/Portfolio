@@ -1,4 +1,3 @@
-```markdown
 # Unauthenticated API Credential Leak
 
 **Tags:** `#api` `#credential-leak` `#information-disclosure` `#misconfiguration`
@@ -86,4 +85,3 @@ curl http://127.0.0.1:3000/api/config
 - Loopback Service Without Authentication — why the API was accessible
 - Default Credentials Not Rotated — the credentials returned were default template accounts
 - Self-Documenting Health Endpoint — another API information disclosure on port 9000
-```

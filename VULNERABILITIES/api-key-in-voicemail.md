@@ -1,4 +1,3 @@
-```markdown
 # API Key Transmitted via Voicemail
 
 **Tags:** `#voip` `#credential-leak` `#freepbx` `#api-key`
@@ -78,4 +77,3 @@ curl -X POST http://127.0.0.1:9000/jobs/export \
 - Hardcoded Template Credentials — how we accessed the FreePBX UCP to read the voicemail
 - Unauthenticated API Credential Leak — how we got the FreePBX login
 - Self-Documenting Health Endpoint — where we learned how to use the key
-```

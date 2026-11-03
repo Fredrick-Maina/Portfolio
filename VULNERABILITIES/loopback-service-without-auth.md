@@ -1,4 +1,3 @@
-```markdown
 # Loopback Service Without Authentication
 
 **Tags:** `#network` `#authorization` `#internal-services` `#pivot`
@@ -78,4 +77,3 @@ for port in 3000 3306 5038 8080 8088 8089 9000; do curl -s http://127.0.0.1:$por
 - Command Injection via shell=True — how we gained local access
 - Unauthenticated API Credential Leak — Watchtower gave up FreePBX creds with no auth
 - Self-Documenting Health Endpoint — automation worker /health exposed API docs
-```

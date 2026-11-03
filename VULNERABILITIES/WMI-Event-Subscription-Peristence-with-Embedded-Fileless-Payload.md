@@ -1,8 +1,3 @@
-Vulnerability Chain — WMI Persistence + Fileless .NET Execution
-
-Since this room chains multiple techniques into one attack, they belong together in a single vuln file.
-markdown
-
 # WMI Event Subscription Persistence with Embedded Fileless Payload
 
 ## Metadata

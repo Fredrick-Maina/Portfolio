@@ -1,4 +1,3 @@
-```markdown
 # SAS Token in Client-Side JavaScript
 
 **Tags:** `#azure` `#cloud` `#credential-leak` `#client-side`
@@ -75,4 +74,3 @@ az storage blob download --name seed_phrase.txt --container-name vault --account
 
 - Overly Permissive SAS Scope — same token, same room
 - Credentials Stored in Blob Storage — what the SAS token exposed in the vault container
-```

@@ -1,4 +1,3 @@
-```markdown
 # Race Condition — Time-of-Check Time-of-Use (TOCTOU)
 
 **Tags:** `#web` `#race-condition` `#toctou` `#api` `#business-logic`
@@ -83,4 +82,3 @@ All claims were processed before the timer updated, granting multiple rewards.
 ## Related
 
 - None — this was a standalone challenge
-```

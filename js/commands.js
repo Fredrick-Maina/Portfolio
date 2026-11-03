@@ -4,29 +4,31 @@ const GITHUB_REPO = "Portfolio";
 const COMMANDS = {
     help: () => `
     <div class="command-list">
-        <div class="cmd-name">help</div><div class="cmd-desc">Show available commands</div>
-        <div class="cmd-name">about</div><div class="cmd-desc">Learn about my background</div>
-        <div class="cmd-name">projects</div><div class="cmd-desc">View my latest work</div>
-        <div class="cmd-name">skills</div><div class="cmd-desc">View my technical skills</div>
-        <div class="cmd-name">techstack</div><div class="cmd-desc">View my environments & tools</div>
-        <div class="cmd-name">writeups</div><div class="cmd-desc">List all available reports</div>
-        <div class="cmd-name">vulnerabilities</div><div class="cmd-desc">List all vulnerability reports</div>
-        <div class="cmd-name">certs</div><div class="cmd-desc">View professional certifications</div>
-        <div class="cmd-name">resume</div><div class="cmd-desc">View or download my resume</div>
-        <div class="cmd-name">cd</div><div class="cmd-desc">Change directory (e.g., cd projects)</div>
-        <div class="cmd-name">pwd</div><div class="cmd-desc">Print working directory</div>
-        <div class="cmd-name">ls</div><div class="cmd-desc">List files in current directory</div>
-        <div class="cmd-name">cat</div><div class="cmd-desc">Read a file (e.g., cat secret.vault)</div>
-        <div class="cmd-name">history</div><div class="cmd-desc">View command history</div>
-        <div class="cmd-name">contact</div><div class="cmd-desc">Ways to reach me</div>
-        <div class="cmd-name">whoami</div><div class="cmd-desc">Display current user info</div>
-        <div class="cmd-name">clear</div><div class="cmd-desc">Clear the terminal screen</div>
-        <div class="cmd-name">sudo</div><div class="cmd-desc">Try it and see...</div>
+        <div class="cmd-hint">Tip: click a command to run it.</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="help">help</button><div class="cmd-desc">Show available commands</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="about">about</button><div class="cmd-desc">Learn about my background</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="projects">projects</button><div class="cmd-desc">View my latest work</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="skills">skills</button><div class="cmd-desc">View my technical skills</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="techstack">techstack</button><div class="cmd-desc">View my environments & tools</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="writeups">writeups</button><div class="cmd-desc">List all CTF writeups</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="vulnerabilities">vulnerabilities</button><div class="cmd-desc">List all vulnerability reports</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="reports">reports</button><div class="cmd-desc">View my penetration testing reports</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="certs">certs</button><div class="cmd-desc">View professional certifications</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="resume">resume</button><div class="cmd-desc">View or download my resume</div>
+        <button type="button" class="cmd-name cmd-link" data-fill="cd ">cd</button><div class="cmd-desc">Change directory (e.g., cd projects)</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="pwd">pwd</button><div class="cmd-desc">Print working directory</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="ls">ls</button><div class="cmd-desc">List files in current directory</div>
+        <button type="button" class="cmd-name cmd-link" data-fill="cat ">cat</button><div class="cmd-desc">Read a file (e.g., cat secret.vault)</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="history">history</button><div class="cmd-desc">View command history</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="contact">contact</button><div class="cmd-desc">Ways to reach me</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="whoami">whoami</button><div class="cmd-desc">Display current user info</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="clear">clear</button><div class="cmd-desc">Clear the terminal screen</div>
+        <button type="button" class="cmd-name cmd-link" data-cmd="sudo">sudo</button><div class="cmd-desc">Try it and see...</div>
     </div>`,
     
     about: () => `
 <div class="profile">
-    <img src="images/profile.jpg" class="profile-pic" alt="Profile">
+    <img src="images/profile.jpg" class="profile-pic" alt="Fredrick Maina">
     <div>
         <div class="profile-name">Fredrick Maina Wanjohi</div>
         <div class="profile-title">Ethical Hacker | Penetration Tester | CS Student</div>
@@ -86,16 +88,15 @@ const COMMANDS = {
 </div>`,
 
     certs: async () => {
-        const docs = await fetchDocs();
-        if (docs.length === 0) return "No certifications found in /documents/.";
-        
-        let list = '<div class="stack">';
-        docs.forEach((doc, i) => {
-            const displayName = doc.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-            list += `<div><strong>${i + 1}. ${escapeHtml(displayName)}</strong> <a href="${escapeHtml(doc.view_url)}" target="_blank" class="writeup-link">[View Cert]</a> <a href="${escapeHtml(doc.download_url)}" download class="writeup-link">[Download]</a></div>`;
-        });
-        list += '</div><br>Use "cd documents" to view files in the terminal.';
-        return list;
+        const docs = await fetchCerts();
+        if (docs.length === 0) return "No certifications found in /certs/.";
+        return renderDocList(docs, "[ CERTIFICATIONS ]", "View Cert", "certs");
+    },
+
+    reports: async () => {
+        const docs = await fetchReports();
+        if (docs.length === 0) return "No reports found in /reports/.";
+        return renderDocList(docs, "[ PENETRATION TESTING REPORTS ]", "View Report", "reports");
     },
 
     projects: async () => {
@@ -154,7 +155,11 @@ const COMMANDS = {
 
     ls: async () => {
         const files = await getFilesForDir(currentDir);
-        return files.map(f => escapeHtml(f)).join("<br>");
+        // Directories cd on click, files cat on click
+        return files.map(f => {
+            const cmd = f.endsWith("/") ? `cd ${f}` : `cat ${f}`;
+            return `<button type="button" class="cmd-link" data-cmd="${escapeHtml(cmd)}">${escapeHtml(f)}</button>`;
+        }).join("<br>");
     },
 
     cd: async (args) => {
@@ -172,7 +177,7 @@ const COMMANDS = {
         }
 
         const target = args.endsWith("/") ? args : args + "/";
-        const validDirs = ["projects/", "writeups/", "documents/", "vulnerabilities/"];
+        const validDirs = ["projects/", "writeups/", "certs/", "reports/", "vulnerabilities/"];
         
         if (currentDir === "/" && validDirs.includes(target)) {
             currentDir = "/" + target;
@@ -207,7 +212,7 @@ const COMMANDS = {
     <div>Once solved, type: <span class="accent">unlock secret.vault &lt;passkey&gt;</span></div>
 </div>`;
             }
-            if (file === "projects" || file === "writeups" || file === "documents" || file === "vulnerabilities") return `<span class="error">cat: ${escapeHtml(file)}: Is a directory</span>`;
+            if (["projects", "writeups", "certs", "reports", "vulnerabilities"].includes(file.replace(/\/$/, ""))) return `<span class="error">cat: ${escapeHtml(file)}: Is a directory</span>`;
         }
 
         // Handle files in /projects/
@@ -225,9 +230,9 @@ const COMMANDS = {
             }
         }
 
-        // Handle files in /documents/
-        if (currentDir === "/documents/") {
-            const docs = await fetchDocs();
+        // Handle files in /certs/ and /reports/
+        if (currentDir === "/certs/" || currentDir === "/reports/") {
+            const docs = currentDir === "/certs/" ? await fetchCerts() : await fetchReports();
             const doc = docs.find(d => {
                 const name = d.name.toLowerCase();
                 return name === file || name === file + ".pdf" || name === file + ".png";
@@ -267,7 +272,7 @@ const COMMANDS = {
                     const text = await contentResponse.text();
                     // Render markdown to HTML using marked.js if available
                     if (typeof marked !== 'undefined') {
-                        return `<div class="markdown-body" style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); margin-top: 10px;">${marked.parse(text)}</div>`;
+                        return `<div class="markdown-body">${marked.parse(text)}</div>`;
                     }
                     return `<pre class="output-line">${escapeHtml(text)}</pre>`;
                 }
@@ -311,7 +316,7 @@ const COMMANDS = {
 };
 
 let cachedRepos = null;
-let cachedDocs = null;
+const cachedManifests = {};
 
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
@@ -360,45 +365,63 @@ async function fetchGitHubRepos() {
     return [];
 }
 
-async function fetchDocs() {
-    if (cachedDocs) return cachedDocs;
-
-    const localCache = localStorage.getItem('github_docs');
-    if (localCache) {
-        try {
-            const { data, timestamp } = JSON.parse(localCache);
-            if (Date.now() - timestamp < CACHE_DURATION) {
-                cachedDocs = data;
-                return cachedDocs;
-            }
-        } catch (e) {}
-    }
+// Load a JSON list of documents, cached in memory and in localStorage for an hour
+async function fetchManifest(url, cacheKey) {
+    if (cachedManifests[url]) return cachedManifests[url];
 
     try {
-        const response = await fetch('Documents/documents.json');
+        const localCache = localStorage.getItem(cacheKey);
+        if (localCache) {
+            const { data, timestamp } = JSON.parse(localCache);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                cachedManifests[url] = data;
+                return data;
+            }
+        }
+    } catch (e) {}
+
+    try {
+        const response = await fetch(url);
         const data = await response.json();
         if (Array.isArray(data)) {
-            cachedDocs = data;
-            localStorage.setItem('github_docs', JSON.stringify({ data: cachedDocs, timestamp: Date.now() }));
-            return cachedDocs;
+            cachedManifests[url] = data;
+            try { localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() })); } catch (e) {}
+            return data;
         }
     } catch (e) {
-        console.error("Error fetching Documents/documents.json:", e);
+        console.error(`Error fetching ${url}:`, e);
     }
 
     return [];
 }
 
+const fetchCerts = () => fetchManifest('Documents/documents.json', 'certs_cache');
+const fetchReports = () => fetchManifest('Documents/reports/reports.json', 'reports_cache');
+
+function renderDocList(docs, heading, viewLabel, dirName) {
+    let list = `<div class="stack"><div class="accent">${heading}</div>`;
+    docs.forEach((doc, i) => {
+        const displayName = doc.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+        list += `<div><strong>${i + 1}. ${escapeHtml(displayName)}</strong> <a href="${escapeHtml(doc.view_url)}" target="_blank" class="writeup-link">[${viewLabel}]</a> <a href="${escapeHtml(doc.download_url)}" download class="writeup-link">[Download]</a></div>`;
+    });
+    list += `</div><br>Use "cd ${dirName}" to view files in the terminal.`;
+    return list;
+}
+
 async function getFilesForDir(dir) {
     if (dir === "/") {
-        return ["about.txt", "contact.md", "projects/", "writeups/", "documents/", "vulnerabilities/", "secret.vault"];
+        return ["about.txt", "contact.md", "projects/", "writeups/", "certs/", "reports/", "vulnerabilities/", "secret.vault"];
     }
     if (dir === "/projects/") {
         const repos = await fetchGitHubRepos();
         return repos.map(r => r.name.toLowerCase() + ".txt");
     }
-    if (dir === "/documents/") {
-        const docs = await fetchDocs();
+    if (dir === "/certs/") {
+        const docs = await fetchCerts();
+        return docs.map(d => d.name.toLowerCase());
+    }
+    if (dir === "/reports/") {
+        const docs = await fetchReports();
         return docs.map(d => d.name.toLowerCase());
     }
     if (dir === "/writeups/") {

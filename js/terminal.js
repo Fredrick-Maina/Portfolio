@@ -36,8 +36,36 @@ function getNextHistory() {
     return "";
 }
 
-// Global focus handler
-document.addEventListener("click", () => {
+// Touch devices: don't pop the on-screen keyboard after every tap
+const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+let suppressNextFocus = false;
+
+// Run a command as if it had been typed at the prompt
+function runCommand(cmd) {
+    if (!currentInput) return;
+    suppressNextFocus = isTouchDevice;
+    currentInput.value = cmd;
+    currentInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+}
+
+// Pre-fill the prompt for commands that need an argument (cd, cat)
+function fillCommand(text) {
+    if (!currentInput) return;
+    currentInput.value = text;
+    currentInput.focus();
+}
+
+// Global click handler: clickable commands, otherwise focus the prompt
+document.addEventListener("click", (e) => {
+    const target = e.target.closest("[data-cmd], [data-fill]");
+    if (target) {
+        e.preventDefault();
+        if (target.dataset.cmd) runCommand(target.dataset.cmd);
+        else fillCommand(target.dataset.fill);
+        return;
+    }
+    // Don't steal focus while the user is selecting text or following a link
+    if (e.target.closest("a") || String(window.getSelection())) return;
     if (currentInput) currentInput.focus();
 });
 
@@ -93,6 +121,8 @@ function createInput(askingName = false) {
     input.type = "text";
     input.autocomplete = "off";
     input.spellcheck = false;
+    input.setAttribute("autocapitalize", "off");
+    input.setAttribute("aria-label", "Terminal command input. Type help for available commands.");
 
     line.appendChild(prompt);
     line.appendChild(input);
@@ -100,9 +130,12 @@ function createInput(askingName = false) {
 
     currentInput = input;
     
-    // Immediate and delayed focus
-    input.focus();
-    setTimeout(() => input.focus(), 100);
+    // Immediate and delayed focus (skipped on touch after a tapped command)
+    if (!suppressNextFocus) {
+        input.focus();
+        setTimeout(() => input.focus(), 100);
+    }
+    suppressNextFocus = false;
 
     input.addEventListener("keydown", handleKeydown);
     targetWrapper.scrollTop = targetWrapper.scrollHeight;

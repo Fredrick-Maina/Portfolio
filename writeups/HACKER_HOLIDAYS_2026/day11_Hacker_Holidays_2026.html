@@ -123,7 +123,7 @@ Disallow: /status</pre>
 
             <!-- Screenshot: Status Page -->
             <figure>
-                <img src="/writeups/images/day11_status.png" alt="Sister-property connectivity tool" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <img src="../images/day11_status.png" alt="Sister-property connectivity tool" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
                 <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 The /status connectivity tool — takes a host and pings it</figcaption>
             </figure>
 
@@ -355,7 +355,7 @@ cat /etc/thm/ai-token                       # Permission denied (root-owned)</pr
 
             <!-- Screenshot: UCP Voicemail -->
             <figure>
-                <img src="/writeups/images/day11_voicemail.png" alt="Voicemail with automation key" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
+                <img src="../images/day11_voicemail.png" alt="Voicemail with automation key" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin:1rem 0;">
                 <figcaption style="color:var(--text-secondary); font-size:0.85rem; text-align:center;">📸 Voicemail: "Automation Key cc_auto_7b3f9a1c4e0d2f6a" &lt;9000&gt;</figcaption>
             </figure>
 
@@ -405,8 +405,8 @@ config: 404</div>
   "endpoints": {
     "GET /health": "service status",
     "POST /jobs/export": {
-      "auth": "Authorization: Bearer <automation key>",
-      "body": {"report": "<report name>"},
+      "auth": "Authorization: Bearer &lt;automation key&gt;",
+      "body": {"report": "&lt;report name&gt;"},
       "desc": "archive the latest data export"
     }
   },

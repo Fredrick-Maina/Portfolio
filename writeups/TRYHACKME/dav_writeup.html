@@ -23,17 +23,17 @@
             <p>a simple ping to make sure the host is up, this is after connecting to the VPN if you are using your own machine.</p>
             <p>Disclaimer: The IP changes every time you start the machine.</p>
             <p>Then</p>
-            <p>nmap -T4 -sVC <MACHINE_IP></p>
+            <p>nmap -T4 -sVC &lt;MACHINE_IP&gt;</p>
             <p>This is what it yielded.</p>
             <p>Only port 80 is open. Even after using the Nmap tag -p- only this port was open.</p>
             <p>From here we pivot, to directory enumeration because the page is a default landing page for the Apache2 server.</p>
-            <p>gobuster -u <url> -w <path_to_Wordlist(common.txt)></p>
+            <p>gobuster -u &lt;url&gt; -w &lt;path_to_Wordlist(common.txt)&gt;</p>
             <p>Interesting find here is the webdav  directory. Navigate to it and it prompts us to sign in.</p>
             <p>Username and password. A simple google search should do the trick</p>
             <p>userrname: wampp</p>
             <p>password: xampp</p>
             <p>After a little research, I found there is a command line tool for signing into webdav. Cadaver, let’s pivot</p>
-            <p>cadaver <http://machine_ip/webdav/></p>
+            <p>cadaver &lt;http://machine_ip/webdav/&gt;</p>
             <p>we already know the username and password.</p>
             <p>You can actually upload something. Through the ‘put’ command.</p>
             <p>This was easy. I have a reverse shell in my working dir, I changed the IP to point to the tun0 one. And the port to 4242 for this challenge.</p>

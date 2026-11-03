@@ -12,7 +12,7 @@ Welcome to my interactive terminal portfolio—a personal website designed to mi
 
 This project combines the nostalgic feel of a command-line interface with modern web development techniques. It showcases my projects, certifications, skills, and contact information through an interactive terminal experience.
 
-One of its standout features is automatic GitHub integration, allowing the portfolio to display my five most recently updated repositories without requiring manual updates.
+One of its standout features is automatic GitHub integration, allowing the portfolio to display my six most recently updated repositories without requiring manual updates.
 
 ---
 
@@ -25,11 +25,12 @@ One of its standout features is automatic GitHub integration, allowing the portf
 * 📂 Terminal navigation
 * 📁 Project showcase
 * 🎓 Certifications section
+* 📑 Penetration testing reports section
 * 📬 Contact information
 * 🌐 GitHub API integration
-* 🔄 Automatically displays the five most recently updated GitHub repositories
+* 🔄 Automatically displays the six most recently updated GitHub repositories
 * 📱 Responsive layout for desktop, tablet, and mobile devices
-* Easter Egg hidden in the secret.vault
+* 🥚 Easter Egg hidden in the secret.vault
 
 ---
 
@@ -37,15 +38,26 @@ One of its standout features is automatic GitHub integration, allowing the portf
 
 The portfolio supports several terminal-style commands, including:
 
-| Command    | Description                      |
-| ---------- | -------------------------------- |
-| `help`     | Display all available commands   |
-| `ls`       | List available directories/files |
-| `cd`       | Navigate between sections        |
-| `cat`      | Display information from files   |
-| `clear`    | Clear the terminal               |
-| `projects` | View recent GitHub projects      |
-| `contact`  | Display contact information      |
+| Command           | Description                         |
+| ----------------- | ----------------------------------- |
+| `help`            | Display all available commands      |
+| `about`           | Learn about my background           |
+| `projects`        | View recent GitHub projects         |
+| `skills`          | View my technical skills            |
+| `techstack`       | View my environments & tools        |
+| `writeups`        | List all CTF writeups               |
+| `vulnerabilities` | List all vulnerability reports      |
+| `reports`         | View penetration testing reports    |
+| `certs`           | View professional certifications    |
+| `resume`          | View or download my resume          |
+| `contact`         | Display contact information         |
+| `ls`              | List available directories/files   |
+| `cd`              | Navigate between sections           |
+| `pwd`             | Print working directory             |
+| `cat`             | Display information from files      |
+| `history`         | View command history                |
+| `whoami`          | Display current user info           |
+| `clear`           | Clear the terminal                  |
 
 Additional commands may be available as the project evolves.
 
@@ -55,7 +67,7 @@ Additional commands may be available as the project evolves.
 
 The portfolio connects to the GitHub API to retrieve my latest repositories dynamically.
 
-Instead of manually editing the portfolio every time I complete a new project, the Projects section automatically displays my **five most recently updated repositories**, ensuring visitors always see my latest work.
+Instead of manually editing the portfolio every time I complete a new project, the Projects section automatically displays my **six most recently updated repositories**, ensuring visitors always see my latest work.
 
 ---
 
@@ -74,15 +86,19 @@ Instead of manually editing the portfolio every time I complete a new project, t
 ```text
 portfolio-website/
 │
-├── documents/
+├── Documents/          # Certificates & resume (indexed by documents.json)
+│   └── reports/        # Penetration testing reports (indexed by reports.json)
+├── VULNERABILITIES/    # Markdown vulnerability reports (indexed by vulnerabilities.json)
+├── data/               # Skills, tech stack & cyber facts JSON
 ├── images/
-├── js/
-├── scripts/
-├── writeups/
+├── js/                 # Terminal commands, input handling & typing effect
+├── projects/           # Static GitHub repos fallback (projects.json)
+├── writeups/           # CTF writeups (indexed by writeups.json)
 │
 ├── index.html
 ├── script.js
-├── styles.css
+├── style.css
+├── git_automation.py   # Regenerates JSON indexes, commits & pushes
 ├── LICENSE
 └── README.md
 ```
@@ -135,7 +151,6 @@ This project was created to:
 * Better command history navigation
 * Themes (green, amber, blue, etc.)
 * File system simulation
-* Downloadable résumé
 * Blog integration
 * Improved animations
 * Enhanced accessibility

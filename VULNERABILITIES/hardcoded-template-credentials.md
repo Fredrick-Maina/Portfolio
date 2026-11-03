@@ -1,4 +1,3 @@
-```markdown
 # Hardcoded Template Credentials (FreePBX CVE-2026)
 
 **Tags:** `#voip` `#freepbx` `#hardcoded-credentials` `#cve`
@@ -71,4 +70,3 @@ The voicemail contained an automation API key used to access the root-level auto
 - Unauthenticated API Credential Leak — how the FreePBX creds were discovered via Watchtower
 - Default Credentials Not Rotated — same vulnerability pattern, different service
 - API Key in Voicemail — what the FreePBX access revealed
-```

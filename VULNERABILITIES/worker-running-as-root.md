@@ -1,4 +1,3 @@
-```markdown
 # Worker Process Running as Root
 
 **Tags:** `#privilege-escalation` `#linux` `#misconfiguration` `#least-privilege`
@@ -93,4 +92,3 @@ Output: `uid=0(root) gid=0(root) groups=0(root)`
 - Command Injection via shell=True — the injection that exploited the root worker
 - Self-Documenting Health Endpoint — the `/health` endpoint revealed the worker ran as root
 - API Key in Voicemail — how we authenticated to the root worker
-```

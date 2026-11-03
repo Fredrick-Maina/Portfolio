@@ -1,4 +1,3 @@
-```markdown
 # Self-Documenting Health Endpoint
 
 **Tags:** `#api` `#information-disclosure` `#misconfiguration` `#enumeration`
@@ -91,4 +90,3 @@ With the auth header format and body schema known, construct a malicious request
 - Loopback Service Without Authentication — why the health endpoint was accessible
 - API Key in Voicemail — where we got the key to use against the documented endpoint
 - Command Injection via shell=True — the vulnerability we exploited after learning the endpoint
-```
