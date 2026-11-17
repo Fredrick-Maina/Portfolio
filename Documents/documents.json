@@ -20,6 +20,11 @@
     "view_url": "Documents/CISCO-ethical-hacker-badge.png"
   },
   {
+    "name": "Cisco Introduction to Cybersecurity.pdf",
+    "download_url": "Documents/Cisco Introduction to Cybersecurity.pdf",
+    "view_url": "Documents/Cisco Introduction to Cybersecurity.pdf"
+  },
+  {
     "name": "Cyber Security 101.pdf",
     "download_url": "Documents/Cyber Security 101.pdf",
     "view_url": "Documents/Cyber Security 101.pdf"
@@ -58,5 +63,10 @@
     "name": "dojo-certificate-0xDrrr3xpl01t.pdf",
     "download_url": "Documents/dojo-certificate-0xDrrr3xpl01t.pdf",
     "view_url": "Documents/dojo-certificate-0xDrrr3xpl01t.pdf"
+  },
+  {
+    "name": "introduction-to-cybersecurity.png",
+    "download_url": "Documents/introduction-to-cybersecurity.png",
+    "view_url": "Documents/introduction-to-cybersecurity.png"
   }
 ]
